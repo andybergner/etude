@@ -1,0 +1,504 @@
+#!/bin/bash
+# etude-install – installiert Etude auf die ganze Festplatte (läuft im Live-System der Etude-ISO)
+#
+# Oberfläche wie bei Omarchy: Vollbild mit Logo, ein Schritt pro Seite (Esc = zurück), am Ende
+# eine Übersicht, in der sich jeder Punkt noch ändern lässt. Danach ohne weitere Fragen:
+#   GPT: 2 GiB EFI (FAT32, als /boot) + btrfs mit @ @home @log @pkg @snapshots
+#   pacstrap mit install/etude-base.packages – aus dem Offline-Repo der ISO (kein Internet nötig)
+#            oder, ohne Offline-Repo, aus dem Internet
+#   Benutzer in "wheel" (sudo), WLAN aus dem Live-System
+#   install/hardware/all.sh   Microcode, Grafiktreiber, Laptop-Fixes (z. B. nouveau aus bei NVIDIA+Intel)
+#   install/config/all.sh     Sprache, Tastatur, sudo, zram, Spiegel, snapper, Limine (wie Omarchy:
+#                             /etc/default/limine aus @@CMDLINE@@-Vorlage, Schnappschüsse im Bootmenü)
+#   install/user/all.sh       Benutzerordner
+# Vorlagen für install/ liegen in default/ (limine, snapper).
+#
+# Protokoll: /tmp/etude-install.log
+# Testlauf ohne Festplatte:  ETUDE_DRY_RUN=1 etude-install
+# Aus dem Internet statt aus dem Offline-Repo:  ETUDE_ONLINE=1 etude-install
+set -uo pipefail
+
+LOG=/tmp/etude-install.log
+MNT=/mnt
+DRY=${ETUDE_DRY_RUN:-}
+: > "$LOG"
+
+# ---------- Dateien der ISO (beim Testen aus dem Repo daneben) ----------
+SHARE=""
+for d in /usr/local/share/etude "$(dirname "$(readlink -f "$0")")/.."; do
+    [ -f "$d/install/helpers/common.sh" ] && { SHARE=$(cd "$d" && pwd); break; }
+done
+VERSION=$(cat "$SHARE/version" 2>/dev/null || echo dev)
+echo "Etude-Installer $VERSION" >> "$LOG"
+LOGO_FILE=""
+for f in "$SHARE/logo.txt" "$SHARE/branding/logo.txt"; do [ -f "$f" ] && { LOGO_FILE=$f; break; }; done
+
+OFFLINE_CONF=/etc/etude/pacman-offline.conf
+OFFLINE_REPO=/var/cache/etude/offline
+OFFLINE=""
+[ -z "${ETUDE_ONLINE:-}" ] && [ -f "$OFFLINE_CONF" ] && [ -e "$OFFLINE_REPO/offline.db" ] && OFFLINE=1
+
+# ---------- Darstellung (shadcn/zinc wie Etude) ----------
+C_FG="#fafafa"; C_MUTED="#a1a1aa"; C_BORDER="#3f3f46"; C_ERR="#ef4444"; C_WARN="#eab308"
+IND="  "                                   # linker Rand für alles
+export GUM_CHOOSE_CURSOR="$IND› " GUM_CHOOSE_CURSOR_FOREGROUND="$C_FG" GUM_CHOOSE_ITEM_FOREGROUND="$C_MUTED" \
+       GUM_CHOOSE_SELECTED_FOREGROUND="$C_FG" GUM_CHOOSE_HEADER_FOREGROUND="$C_FG" GUM_CHOOSE_HEIGHT=12 \
+       GUM_CHOOSE_SHOW_HELP=false \
+       GUM_INPUT_PROMPT="$IND› " GUM_INPUT_PROMPT_FOREGROUND="$C_FG" GUM_INPUT_CURSOR_FOREGROUND="$C_FG" \
+       GUM_INPUT_HEADER_FOREGROUND="$C_FG" GUM_INPUT_PLACEHOLDER_FOREGROUND="$C_BORDER" GUM_INPUT_WIDTH=50 \
+       GUM_INPUT_SHOW_HELP=false \
+       GUM_FILTER_INDICATOR="›" GUM_FILTER_INDICATOR_FOREGROUND="$C_FG" GUM_FILTER_MATCH_FOREGROUND="$C_FG" \
+       GUM_FILTER_PROMPT="$IND› " GUM_FILTER_HEADER_FOREGROUND="$C_FG" GUM_FILTER_HEIGHT=12 \
+       GUM_SPIN_SPINNER=dot GUM_SPIN_SPINNER_FOREGROUND="$C_FG"
+
+logo() {
+    if [ -n "$LOGO_FILE" ]; then gum style --foreground "$C_FG" --bold --margin "1 0 0 0" < "$LOGO_FILE"
+    else gum style --foreground "$C_FG" --bold --margin "1 2" "Etude"; fi
+}
+# Seite: Logo, „Schritt n von m · Titel“, Trennlinie
+STEP_COUNT=6
+screen() {    # screen <titel> [schrittnummer]
+    clear
+    logo
+    local meta=""
+    [ -n "${2:-}" ] && meta="Schritt $2 von $STEP_COUNT  ·  "
+    gum style --foreground "$C_MUTED" --margin "1 2 0 2" "${meta}${1}"
+    gum style --foreground "$C_BORDER" --margin "0 2 1 2" "$(printf '─%.0s' $(seq 1 56))"
+}
+text()  { gum style --foreground "$C_MUTED" --margin "0 2" "$@"; }
+note()  { gum style --foreground "$C_FG" --margin "0 2" "$@"; }
+warn()  { gum style --foreground "$C_WARN" --margin "0 2" "$@"; }
+alert() { gum style --foreground "$C_ERR" --bold --margin "0 2" "$@"; }
+# Auswahl: choose <überschrift> [--selected x] einträge… → gewählter Eintrag; Esc → Rückgabe 1
+choose() {
+    local header=$1; shift
+    gum choose --header "$IND$header" "$@"
+}
+yesno() {     # yesno <frage> <ja-text> <nein-text>  → 0 bei Ja
+    local r
+    r=$(gum choose --header "$IND$1" "$2" "$3") || return 1
+    [ "$r" = "$2" ]
+}
+
+fail() {
+    echo "!! $*" >> "$LOG"
+    while :; do
+        screen "Fehler"
+        alert "Die Installation ist fehlgeschlagen: $*"
+        echo
+        tail -n 12 "$LOG" | sed 's/[[:cntrl:]]//g' | gum style --foreground "$C_MUTED" --margin "0 2" --width 100
+        echo
+        case $(choose "Wie weiter?" "Protokoll ansehen" "Installer neu starten" "Zur Konsole") in
+            "Protokoll ansehen")     gum pager < "$LOG" ;;
+            "Installer neu starten") exec "$0" ;;
+            *) clear; echo "Protokoll: $LOG   –   neu starten mit: etude-install"; exit 1 ;;
+        esac
+    done
+}
+
+# ---------- Fortschritt beim Installieren ----------
+# Balken, Spinner, dazu die letzte Zeile aus dem Protokoll, damit man sieht, dass noch gearbeitet
+# wird. Läuft als Hintergrund-Subshell – so stehen auch Funktionen zur Verfügung.
+STEP_NO=0
+STEP_TOTAL=$(grep -c '^ *step "' "$0" 2>/dev/null || echo 30)
+bar() {
+    local n=$(( STEP_NO * 24 / STEP_TOTAL )) b=""
+    for ((k = 0; k < 24; k++)); do if [ $k -lt $n ]; then b+="█"; else b+="░"; fi; done
+    printf '%s %2d/%d' "$b" "$STEP_NO" "$STEP_TOTAL"
+}
+step() {
+    local label=$1; shift
+    STEP_NO=$((STEP_NO + 1))
+    echo "==> $label" >> "$LOG"
+    if [ -n "$DRY" ]; then echo "    (dry) $*" >> "$LOG"; sleep 0.1; printf '%s\033[32m✓\033[0m %s\n' "$IND" "$label"; return 0; fi
+    ( "$@" ) >> "$LOG" 2>&1 &
+    local pid=$! i=0 spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' last cols
+    cols=$(tput cols 2>/dev/null || echo 100)
+    while kill -0 "$pid" 2>/dev/null; do
+        last=$(tail -n 1 "$LOG" 2>/dev/null | tr -d '\r' | tr -cd '[:print:]')
+        printf '\r\033[K%s%s %s  %s  \033[2m%s\033[0m' "$IND" "${spin:i++%10:1}" "$(bar)" "$label" \
+            "${last:0:$(( cols > 100 ? cols - 80 : 20 ))}"
+        sleep 0.1
+    done
+    wait "$pid"; local rc=$?
+    printf '\r\033[K'
+    if [ $rc -eq 0 ]; then printf '%s\033[32m✓\033[0m %s\n' "$IND" "$label"
+    else printf '%s\033[31m✗\033[0m %s\n' "$IND" "$label"; fail "$label"; fi
+}
+skip_step() { STEP_NO=$((STEP_NO + 1)); }
+in_target() { arch-chroot "$MNT" "$@"; }
+online() { curl -fsS --max-time 4 -o /dev/null https://archlinux.org/ 2>/dev/null; }
+
+# ---------- Voraussetzungen ----------
+command -v gum >/dev/null || { echo "gum fehlt"; exit 1; }
+[ -n "$SHARE" ] || { echo "Installationsdateien (install/) nicht gefunden."; exit 1; }
+if [ ! -d /sys/firmware/efi ] && [ -z "$DRY" ]; then
+    screen "Kein UEFI"
+    alert "Dieser Computer wurde nicht im UEFI-Modus gestartet."
+    text "" "Etude braucht UEFI. Im BIOS den UEFI-Modus einschalten (kein Legacy/CSM)" \
+         "und Secure Boot ausschalten, dann vom USB-Stick neu starten."
+    echo; choose "" "Zur Konsole" >/dev/null; exit 1
+fi
+
+# ---------- Willkommen ----------
+screen "Willkommen"
+note "Dieser Assistent installiert Etude $VERSION auf diesen Computer."
+case $VERSION in
+    *-alpha.*) warn "Alpha-Version: zum Ausprobieren – es kann noch einiges fehlen oder kaputt sein." ;;
+    *-beta.*)  warn "Beta-Version: fast fertig, aber noch nicht für den Alltag gedacht." ;;
+    *-rc.*)    warn "Release-Kandidat: wird so die nächste Version, wenn keine Fehler auftauchen." ;;
+esac
+echo
+if [ -n "$OFFLINE" ]; then
+    text "Alle Pakete sind auf dem USB-Stick – für die Installation ist kein Internet nötig."
+else
+    text "Für die Installation wird eine Internetverbindung gebraucht."
+fi
+text "Die ausgewählte Festplatte wird dabei vollständig gelöscht."
+echo
+case $(choose "" "Etude installieren" "Zur Konsole") in
+    "Etude installieren") ;;
+    *) clear; echo "Installer neu starten mit: etude-install"; exit 0 ;;
+esac
+
+# ---------- Werte ----------
+LOCALE=de_DE.UTF-8; LANG_LABEL=Deutsch
+KB_LABEL="Deutsch (de)"; XKB=de; XKB_VAR=""; KEYMAP=de-latin1; KB_SET=""
+TZ_NAME=Europe/Berlin
+NET_LABEL=""
+FULLNAME=""; USERNAME=""; PW1=""; HOSTNAME_NEW=etude
+DISK=""; DISK_LABEL=""
+
+KEYBOARDS=("Deutsch (de)" "Deutsch, ohne Akzenttasten (de nodeadkeys)" "Schweiz (ch)" "Österreich (at)"
+           "English US (us)" "English UK (gb)" "Français (fr)" "Español (es)" "Italiano (it)")
+set_keyboard() {
+    KB_LABEL=$1
+    case $1 in
+        "Deutsch (de)")       XKB=de; XKB_VAR="";         KEYMAP=de-latin1 ;;
+        *nodeadkeys*)         XKB=de; XKB_VAR=nodeadkeys; KEYMAP=de-latin1-nodeadkeys ;;
+        "Schweiz (ch)")       XKB=ch; XKB_VAR="";         KEYMAP=de_CH-latin1 ;;
+        "Österreich (at)")    XKB="at"; XKB_VAR="";         KEYMAP=de-latin1 ;;
+        "English UK (gb)")    XKB=gb; XKB_VAR="";         KEYMAP=uk ;;
+        "Français (fr)")      XKB=fr; XKB_VAR="";         KEYMAP=fr-latin1 ;;
+        "Español (es)")       XKB=es; XKB_VAR="";         KEYMAP=es ;;
+        "Italiano (it)")      XKB=it; XKB_VAR="";         KEYMAP=it ;;
+        *)                    XKB=us; XKB_VAR="";         KEYMAP=us ;;
+    esac
+    loadkeys "$KEYMAP" 2>/dev/null || true
+}
+
+# ---------- Schritte (Rückgabe: 0 weiter, 1 zurück, 2 überspringen) ----------
+step_language() {
+    screen "Sprache" 1
+    local r
+    r=$(choose "Sprache des Systems" --selected "$LANG_LABEL" "Deutsch" "English") || return 1
+    LANG_LABEL=$r
+    case $r in
+        Deutsch) LOCALE=de_DE.UTF-8; [ -n "$KB_SET" ] || set_keyboard "Deutsch (de)" ;;
+        *)       LOCALE=en_US.UTF-8; [ -n "$KB_SET" ] || set_keyboard "English US (us)" ;;
+    esac
+}
+step_keyboard() {
+    screen "Tastatur" 2
+    local r
+    r=$(choose "Tastaturlayout" --selected "$KB_LABEL" "${KEYBOARDS[@]}") || return 1
+    set_keyboard "$r"; KB_SET=1
+}
+step_timezone() {
+    screen "Zeitzone" 3
+    local r zones=("Europe/Berlin" "Europe/Vienna" "Europe/Zurich" "Europe/London" "UTC")
+    r=$(choose "Zeitzone" --selected "$TZ_NAME" "${zones[@]}" "Andere …") || return 1
+    if [ "$r" = "Andere …" ]; then
+        screen "Zeitzone" 3
+        r=$(timedatectl list-timezones | gum filter --header "${IND}Zeitzone suchen" --placeholder "z. B. Paris") || return 1
+    fi
+    TZ_NAME=$r
+}
+wifi_connect() {
+    if ! nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; then
+        warn "Kein WLAN-Adapter gefunden – bitte ein Netzwerkkabel einstecken."; sleep 2; return 1
+    fi
+    gum spin --title "Suche WLANs …" -- sh -c 'nmcli device wifi rescan >/dev/null 2>&1; sleep 3'
+    local nets choice ssid pw
+    mapfile -t nets < <(nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null \
+        | awk -F: '$1 != "" && !seen[$1]++ { printf "%s  (%s%%%s)\n", $1, $2, ($3 != "" && $3 != "--") ? ", gesichert" : "" }')
+    [ ${#nets[@]} -gt 0 ] || { warn "Keine WLANs gefunden."; sleep 2; return 1; }
+    choice=$(choose "WLAN auswählen" "${nets[@]}") || return 1
+    ssid=${choice%  (*}
+    pw=$(gum input --password --header "${IND}Kennwort für $ssid (leer bei offenem WLAN)") || return 1
+    if gum spin --title "Verbinde mit $ssid …" -- nmcli device wifi connect "$ssid" ${pw:+password "$pw"} >> "$LOG" 2>&1; then
+        NET_LABEL=$ssid
+    else
+        warn "Verbindung fehlgeschlagen – Kennwort prüfen."; sleep 2; return 1
+    fi
+}
+step_network() {
+    while :; do
+        if online; then
+            [ -n "$NET_LABEL" ] || NET_LABEL="Verbunden"
+            return 2
+        fi
+        screen "Netzwerk" 4
+        if [ -n "$OFFLINE" ]; then
+            text "Für die Installation ist kein Internet nötig. Verbinde dich nur, wenn Etude" \
+                 "danach gleich online sein soll – das WLAN wird ins neue System übernommen."
+            echo
+            case $(choose "Netzwerk" "Ohne Netzwerk weiter" "WLAN verbinden") in
+                "Ohne Netzwerk weiter") NET_LABEL=""; return 0 ;;
+                "WLAN verbinden") wifi_connect ;;
+                *) return 1 ;;
+            esac
+        else
+            text "Für die Installation wird eine Internetverbindung gebraucht."
+            echo
+            case $(choose "Netzwerk" "WLAN verbinden" "Erneut prüfen (Kabel)") in
+                "WLAN verbinden") wifi_connect ;;
+                "Erneut prüfen (Kabel)") ;;
+                *) return 1 ;;
+            esac
+        fi
+    done
+}
+step_account() {
+    local f=0 v suggest pw2
+    [ "${dir:-1}" -lt 0 ] && [ -n "$USERNAME" ] && f=3     # zurück von der Festplatte: letztes Feld
+    while :; do
+        screen "Konto" 5
+        case $f in
+        0)  v=$(gum input --header "${IND}Dein Name" --placeholder "z. B. Andy Muster" --value "$FULLNAME") || return 1
+            FULLNAME=${v//:/}; f=1 ;;
+        1)  suggest=${USERNAME:-$(printf '%s' "${FULLNAME%% *}" | tr 'A-ZÄÖÜ' 'a-zäöü' | sed 's/ä/ae/g; s/ö/oe/g; s/ü/ue/g; s/ß/ss/g; s/[^a-z0-9_-]//g')}
+            v=$(gum input --header "${IND}Benutzername (zum Anmelden)" --placeholder "andy" --value "$suggest") || { f=0; continue; }
+            if [[ $v =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$v" != root ]; then USERNAME=$v; f=2
+            else warn "Kleinbuchstaben, Ziffern, _ und -; muss mit einem Buchstaben beginnen."; sleep 2; fi ;;
+        2)  v=$(gum input --password --header "${IND}Kennwort" --placeholder "mindestens 8 Zeichen") || { f=1; continue; }
+            if [ ${#v} -lt 8 ]; then warn "Das Kennwort muss mindestens 8 Zeichen haben."; sleep 2; continue; fi
+            pw2=$(gum input --password --header "${IND}Kennwort wiederholen") || continue
+            if [ "$v" != "$pw2" ]; then warn "Die Kennwörter stimmen nicht überein."; sleep 2; continue; fi
+            PW1=$v; v=""; pw2=""; f=3 ;;
+        3)  v=$(gum input --header "${IND}Gerätename (so heißt der Computer im Netzwerk)" --placeholder "etude" --value "$HOSTNAME_NEW") || { f=2; continue; }
+            if [[ $v =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]]; then HOSTNAME_NEW=$v; return 0
+            else warn "Nur Buchstaben, Ziffern und Bindestrich (nicht am Anfang/Ende)."; sleep 2; fi ;;
+        esac
+    done
+}
+step_disk() {
+    screen "Festplatte" 6
+    local live disks=() name type choice
+    live=$(lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true)
+    while read -r name type; do
+        [ "$type" = disk ] || continue
+        [[ $name =~ ^/dev/(loop|zram|sr) ]] && continue
+        [ -n "$live" ] && [ "$name" = "/dev/$live" ] && continue          # der USB-Stick mit der ISO
+        disks+=("$name  $(lsblk -dno SIZE "$name" | tr -d ' ')  $(lsblk -dno MODEL "$name" | sed 's/ *$//')")
+    done < <(lsblk -dpnro NAME,TYPE 2>/dev/null)
+    [ ${#disks[@]} -gt 0 ] || { [ -n "$DRY" ] && disks=("/dev/vda  20G  Testplatte"); }
+    [ ${#disks[@]} -gt 0 ] || fail "Keine Festplatte gefunden."
+    text "Die ausgewählte Festplatte wird vollständig gelöscht."
+    echo
+    choice=$(choose "Auf welche Festplatte soll Etude?" ${DISK_LABEL:+--selected "$DISK_LABEL"} "${disks[@]}") || return 1
+    DISK_LABEL=$choice; DISK=${choice%% *}
+}
+
+# ---------- Ablauf: vor/zurück, danach Übersicht ----------
+STEPS=(language keyboard timezone network account disk)
+i=0; dir=1
+while [ $i -lt ${#STEPS[@]} ]; do
+    if [ $i -lt 0 ]; then
+        screen "Abbrechen"
+        if yesno "Installation abbrechen?" "Nein, weiter" "Ja, abbrechen"; then i=0; dir=1; continue; fi
+        clear; echo "Abgebrochen. Neu starten mit: etude-install"; exit 0
+    fi
+    "step_${STEPS[$i]}"
+    case $? in
+        0) dir=1; i=$((i + 1)) ;;
+        1) dir=-1; i=$((i - 1)) ;;
+        *) i=$((i + dir)) ;;
+    esac
+done
+
+summary_lines() {
+    printf '%s|%s\n' \
+        "Sprache       $LANG_LABEL"                          language \
+        "Tastatur      $KB_LABEL"                            keyboard \
+        "Zeitzone      $TZ_NAME"                             timezone \
+        "Netzwerk      ${NET_LABEL:-ohne}"                   network \
+        "Konto         $USERNAME${FULLNAME:+ ($FULLNAME)}"   account \
+        "Gerätename    $HOSTNAME_NEW"                        account \
+        "Festplatte    $DISK_LABEL"                          disk \
+        "──────────────────────────────"                    none \
+        "Installieren"                                       install \
+        "Abbrechen"                                          quit
+}
+while :; do
+    screen "Übersicht"
+    if [ -n "$OFFLINE" ]; then text "Installation vom USB-Stick (offline)."; else text "Installation aus dem Internet."; fi
+    text "Einen Punkt auswählen, um ihn zu ändern."
+    echo
+    pick=$(summary_lines | gum choose --label-delimiter "|" --header "${IND}Bereit zur Installation" \
+        --selected "Installieren" --height 12) || pick=none
+    case $pick in
+        install)
+            screen "Festplatte löschen"
+            alert "ALLE DATEN auf $DISK_LABEL werden gelöscht."
+            text "" "Danach wird ohne weitere Fragen installiert (etwa 5–15 Minuten)."
+            echo
+            yesno "Wirklich installieren?" "Ja, Festplatte löschen und installieren" "Zurück" && break ;;
+        quit)    clear; echo "Abgebrochen. Neu starten mit: etude-install"; exit 0 ;;
+        none|"") ;;
+        *)       "step_$pick" ;;
+    esac
+done
+
+# =====================================================================================
+# Installation
+# =====================================================================================
+SRC=$SHARE/install
+DEFAULTS=$SHARE/default
+[ -f "$DEFAULTS/limine/default.conf" ] || fail "Vorlagen (default/limine) nicht gefunden."
+list() { grep -hv '^[[:space:]]*#' "$@" | awk 'NF { print $1 }'; }
+mapfile -t BASE_PKGS < <(list "$SRC/etude-base.packages")
+mapfile -t BOOT_PKGS < <(list "$SRC/etude-boot.packages")
+TARGET=/var/tmp/etude                           # im neuen System (/tmp ist in arch-chroot leer)
+
+PART_SUFFIX=""; [[ $DISK =~ [0-9]$ ]] && PART_SUFFIX=p      # nvme0n1 → nvme0n1p1
+EFI_PART=${DISK}${PART_SUFFIX}1
+ROOT_PART=${DISK}${PART_SUFFIX}2
+BTRFS_OPTS=compress=zstd:1
+
+screen "Installation"
+note "Etude wird installiert …"
+echo
+
+# ---------- Partitionen und Dateisysteme ----------
+# EFI 2 GiB: Kernel und Initramfs liegen dort, für jeden Schnappschuss im Bootmenü ggf. ein Satz mehr
+step "Uhrzeit synchronisieren"        timedatectl set-ntp true
+step "Festplatte leeren"              bash -c "umount -R $MNT 2>/dev/null; swapoff -a; wipefs -af $DISK && sgdisk --zap-all $DISK"
+step "Partitionen anlegen"            sgdisk -n1:0:+2G -t1:ef00 -c1:EFI -n2:0:0 -t2:8300 -c2:Etude "$DISK"
+step "Partitionen einlesen"           bash -c "partprobe $DISK; udevadm settle; sleep 1"
+step "EFI-Partition formatieren"      mkfs.fat -F32 -n ETUDE-EFI "$EFI_PART"
+step "btrfs anlegen"                  mkfs.btrfs -f -L Etude "$ROOT_PART"
+step "Subvolumes anlegen"             bash -c "mount $ROOT_PART $MNT && for s in @ @home @log @pkg @snapshots; do btrfs subvolume create $MNT/\$s; done; umount $MNT"
+step "Dateisysteme einhängen"         bash -c "
+    mount -o $BTRFS_OPTS,subvol=@ $ROOT_PART $MNT &&
+    mkdir -p $MNT/{home,var/log,var/cache/pacman/pkg,.snapshots,boot} &&
+    mount -o $BTRFS_OPTS,subvol=@home $ROOT_PART $MNT/home &&
+    mount -o $BTRFS_OPTS,subvol=@log $ROOT_PART $MNT/var/log &&
+    mount -o $BTRFS_OPTS,subvol=@pkg $ROOT_PART $MNT/var/cache/pacman/pkg &&
+    mount -o $BTRFS_OPTS,subvol=@snapshots $ROOT_PART $MNT/.snapshots &&
+    mount -o umask=0077 $EFI_PART $MNT/boot"
+
+# ---------- Pakete ----------
+if [ -n "$OFFLINE" ]; then
+    # Offline-Repo der ISO: pacstrap -c nimmt die Pakete direkt von dort (CacheDir in der Config)
+    PACSTRAP=(pacstrap -K -c -C "$OFFLINE_CONF")
+    TARGET_PACMAN=(pacman --config "$OFFLINE_CONF")
+    skip_step
+else
+    # [etude]-Repo muss im Live-System eingetragen sein
+    grep -q '^\[etude\]' /etc/pacman.conf || cat >> /etc/pacman.conf <<'REPO'
+
+[etude]
+SigLevel = Optional TrustAll
+Server = https://github.com/andybergner/etude/releases/download/repo
+REPO
+    PACSTRAP=(pacstrap -K)
+    TARGET_PACMAN=(pacman)
+    step "Paketquellen aktualisieren" pacman -Sy --noconfirm
+fi
+step "System installieren (dauert)"   "${PACSTRAP[@]}" "$MNT" "${BASE_PKGS[@]}"
+step "fstab schreiben"                bash -c "genfstab -U $MNT >> $MNT/etc/fstab"
+# Für Updates danach: pacman.conf des Live-Systems (mit [etude]), Spiegelliste falls vorhanden
+# (fehlt sie, trägt install/config/pacman.sh den weltweiten Arch-Spiegel ein)
+step "Paketquellen übernehmen"        bash -c "
+    cp /etc/pacman.conf $MNT/etc/pacman.conf &&
+    if grep -q '^[[:space:]]*Server' /etc/pacman.d/mirrorlist 2>/dev/null; then cp /etc/pacman.d/mirrorlist $MNT/etc/pacman.d/mirrorlist; fi"
+if [ -n "$OFFLINE" ]; then
+    # dasselbe Repo auch im neuen System, für Hardware-Pakete und Bootmenü-Werkzeuge
+    step "Offline-Repo einbinden"     bash -c "
+        mkdir -p $MNT$OFFLINE_REPO $MNT/etc/etude &&
+        mount --bind $OFFLINE_REPO $MNT$OFFLINE_REPO &&
+        cp $OFFLINE_CONF $MNT$OFFLINE_CONF"
+else
+    skip_step
+fi
+
+# ---------- Bausteine ins neue System ----------
+ROOT_UUID=$( [ -n "$DRY" ] && echo DRY-UUID || blkid -s UUID -o value "$ROOT_PART")
+step "Installationsdateien kopieren"  bash -c "
+    rm -rf $MNT$TARGET && mkdir -p $MNT$TARGET/install $MNT$TARGET/default &&
+    cp -r $SRC/. $MNT$TARGET/install/ && cp -r $DEFAULTS/limine $DEFAULTS/snapper $MNT$TARGET/default/ &&
+    chmod -R a+rX $MNT$TARGET &&
+    cat > $MNT$TARGET/install/env <<ENV
+ETUDE_LOCALE='$LOCALE'
+ETUDE_KEYMAP='$KEYMAP'
+ETUDE_XKB='$XKB'
+ETUDE_XKB_VARIANT='$XKB_VAR'
+ETUDE_TZ='$TZ_NAME'
+ETUDE_HOSTNAME='$HOSTNAME_NEW'
+ETUDE_ROOT_UUID='$ROOT_UUID'
+ETUDE_DISK='$DISK'
+ETUDE_PACMAN_CONF='${OFFLINE:+$OFFLINE_CONF}'
+ENV"
+# Teil von install/ im neuen System ausführen
+part() { arch-chroot "$MNT" env ETUDE_INSTALL="$TARGET/install" bash "$TARGET/install/$1"; }
+
+# Benutzer (Kennwort über stdin, nicht in der Befehlszeile – und nie im Protokoll)
+echo "==> Benutzer anlegen" >> "$LOG"
+if [ -z "$DRY" ]; then
+    in_target useradd -m -G wheel -s /bin/bash -c "$FULLNAME" "$USERNAME" >> "$LOG" 2>&1 || fail "Benutzer anlegen"
+    printf '%s:%s\n' "$USERNAME" "$PW1" | in_target chpasswd >> "$LOG" 2>&1 || fail "Kennwort setzen"
+fi
+PW1=""
+
+# WLAN aus dem Live-System übernehmen (nur gespeicherte Verbindungen)
+step "Netzwerk übernehmen"            bash -c "
+    mkdir -p $MNT/etc/NetworkManager/system-connections &&
+    cp -a /etc/NetworkManager/system-connections/. $MNT/etc/NetworkManager/system-connections/ 2>/dev/null;
+    chmod 600 $MNT/etc/NetworkManager/system-connections/* 2>/dev/null; true"
+
+# snapper legt /.snapshots selbst als Subvolume an und verträgt kein vorhandenes →
+# kurz aushängen, Konfiguration anlegen, dann wieder unser @snapshots einhängen
+step "Schnappschüsse vorbereiten"     bash -c "
+    umount $MNT/.snapshots && rmdir $MNT/.snapshots &&
+    arch-chroot $MNT snapper --no-dbus -c root create-config / &&
+    btrfs subvolume delete $MNT/.snapshots &&
+    mkdir $MNT/.snapshots && mount -o $BTRFS_OPTS,subvol=@snapshots $ROOT_PART $MNT/.snapshots &&
+    chmod 750 $MNT/.snapshots"
+
+# Bootmenü-Werkzeuge (limine-update, limine-snapper-sync) – optional: fehlen sie,
+# schreibt config/limine.sh feste Einträge
+BOOT_TOOLS=""
+if [ -z "$DRY" ] && in_target "${TARGET_PACMAN[@]}" -Sy >> "$LOG" 2>&1 \
+        && in_target "${TARGET_PACMAN[@]}" -Si "${BOOT_PKGS[@]}" >/dev/null 2>&1; then BOOT_TOOLS=1; fi
+if [ -n "$BOOT_TOOLS" ]; then
+    step "Bootmenü-Werkzeuge installieren" in_target "${TARGET_PACMAN[@]}" -S --needed --noconfirm "${BOOT_PKGS[@]}"
+else
+    echo "==> Bootmenü-Werkzeuge nicht verfügbar – feste Einträge" >> "$LOG"
+    skip_step
+fi
+
+step "Hardware anpassen"              part hardware/all.sh
+step "System einrichten + Bootloader" part config/all.sh
+step "Benutzerordner"                 arch-chroot "$MNT" runuser -l "$USERNAME" -c "ETUDE_INSTALL=$TARGET/install bash $TARGET/install/user/all.sh"
+
+# Aufräumen: Offline-Repo aushängen, Bausteine löschen, Protokoll ins neue System
+step "Aufräumen"                      bash -c "
+    if mountpoint -q $MNT$OFFLINE_REPO; then umount $MNT$OFFLINE_REPO; fi
+    rm -rf $MNT/var/cache/etude $MNT$OFFLINE_CONF $MNT/var/lib/pacman/sync/offline.* $MNT$TARGET
+    rmdir $MNT/etc/etude 2>/dev/null
+    mkdir -p $MNT/var/log/etude && cp $LOG $MNT/var/log/etude/install.log; true"
+step "Aushängen"                      bash -c "sync; umount -R $MNT"
+
+# ---------- Fertig ----------
+screen "Fertig"
+note "Etude ist installiert."
+echo
+[ -n "$BOOT_TOOLS" ] || { warn "Hinweis: Schnappschüsse im Bootmenü sind noch nicht aktiv (Pakete fehlten)."; echo; }
+text "Entferne den USB-Stick und starte neu. Danach erscheint der Etude-Anmeldebildschirm –" \
+     "melde dich als $USERNAME an."
+echo
+case $(choose "" "Neu starten" "Zur Konsole") in
+    "Neu starten") [ -n "$DRY" ] || reboot ;;
+    *) clear ;;
+esac

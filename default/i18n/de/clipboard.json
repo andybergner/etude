@@ -1,0 +1,7 @@
+{
+  "clipboard.title": "Zwischenablage",
+  "clipboard.clearAll": "Alle löschen",
+  "clipboard.delete": "Löschen",
+  "clipboard.empty": "Hier erscheint, was du kopierst.",
+  "clipboard.missing": "Für den Verlauf wird cliphist benötigt (sudo pacman -S cliphist)."
+}

@@ -1,0 +1,3 @@
+module Etude.Lock
+LockSurface 1.0 LockSurface.qml
+StatusIcons 1.0 StatusIcons.js

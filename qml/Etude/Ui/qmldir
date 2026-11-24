@@ -1,0 +1,32 @@
+module Etude.Ui
+singleton Theme 1.0 Theme.qml
+Button 1.0 Button.qml
+Kbd 1.0 Kbd.qml
+EtudeLogo 1.0 EtudeLogo.qml
+Surface 1.0 Surface.qml
+MenuItem 1.0 MenuItem.qml
+MenuSeparator 1.0 MenuSeparator.qml
+MenuLabel 1.0 MenuLabel.qml
+ContextMenu 1.0 ContextMenu.qml
+Input 1.0 Input.qml
+Avatar 1.0 Avatar.qml
+Calendar 1.0 Calendar.qml
+Slider 1.0 Slider.qml
+Switch 1.0 Switch.qml
+SidebarMenuButton 1.0 SidebarMenuButton.qml
+SidebarGroupLabel 1.0 SidebarGroupLabel.qml
+Tooltip 1.0 Tooltip.qml
+HoverLayer 1.0 HoverLayer.qml
+Breadcrumb 1.0 Breadcrumb.qml
+Select 1.0 Select.qml
+Label 1.0 Label.qml
+Field 1.0 Field.qml
+Dialog 1.0 Dialog.qml
+singleton I18n 1.0 I18n.qml
+singleton Notify 1.0 Notify.qml
+Translations 1.0 Translations.qml
+Config 1.0 Config.qml
+internal WatchedFile WatchedFile.qml
+FocusRoot 1.0 FocusRoot.qml
+AppWindow 1.0 AppWindow.qml
+FocusNav 1.0 FocusNav.js

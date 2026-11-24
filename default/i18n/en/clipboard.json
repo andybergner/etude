@@ -1,0 +1,7 @@
+{
+  "clipboard.title": "Clipboard",
+  "clipboard.clearAll": "Clear all",
+  "clipboard.delete": "Delete",
+  "clipboard.empty": "Things you copy will show up here.",
+  "clipboard.missing": "The history needs cliphist (sudo pacman -S cliphist)."
+}

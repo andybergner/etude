@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Etude
+Comment=Etude desktop on Hyprland
+Exec=etude-session
+Type=Application
+DesktopNames=Hyprland;Etude

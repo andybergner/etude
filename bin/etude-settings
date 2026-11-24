@@ -1,0 +1,36 @@
+#!/bin/sh
+# Öffnet die Etude-Einstellungen (App-ID: com.etude.settings), optional direkt auf einer Seite:
+#   etude-settings            -> System
+#   etude-settings sound      -> System › Sound
+#   etude-settings network
+# Läuft die App schon, wird nur die Seite gewechselt und das Fenster nach vorne geholt.
+APP_ID="com.etude.settings"
+# Wo Etude liegt: ETUDE_HOME, sonst das Repo (Entwicklung), sonst das Paket
+SELF_DIR=$(dirname "$(readlink -f "$0")")
+if [ -z "${ETUDE_HOME:-}" ]; then
+    if [ -f "$SELF_DIR/../shell/shell.qml" ]; then ETUDE_HOME=$(cd "$SELF_DIR/.." && pwd); else ETUDE_HOME=/usr/share/etude; fi
+fi
+export ETUDE_HOME
+# Repo-Module vor den installierten (nur in der Entwicklung gibt es $ETUDE_HOME/qml)
+[ -d "$ETUDE_HOME/qml" ] && export QML_IMPORT_PATH="$ETUDE_HOME/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+APP="$ETUDE_HOME/apps/settings"
+PAGE="${1:-system}"
+
+
+# Läuft ein Prozess mit dieser App-ID?
+# Jede Etude-App wird mit ETUDE_APP_ID=<app-id> gestartet; die Variable steht in
+# /proc/<pid>/environ. So zählt nur die App-ID – nicht Titel, Pfad oder Programmname.
+app_pid() {
+    for p in $(pgrep -x qs); do
+        tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -qx "ETUDE_APP_ID=$1" && { echo "$p"; return 0; }
+    done
+    return 1
+}
+
+if pid="$(app_pid "$APP_ID")" && qs -p "$APP" ipc call settings open "$PAGE" >/dev/null 2>&1; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"pid:$pid\" })" >/dev/null 2>&1
+    exit 0
+fi
+
+# Nicht gestartet -> mit App-ID in der Umgebung neu starten (vom Terminal gelöst)
+QS_APP_ID="$APP_ID" ETUDE_APP_ID="$APP_ID" ETUDE_SETTINGS_PAGE="$PAGE" setsid -f qs -p "$APP" >/dev/null 2>&1

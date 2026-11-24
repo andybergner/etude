@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Hängt das Repo für die Entwicklung ins System ein (nur Symlinks, nichts wird kopiert).
+#
+#   ~/.config/etude/dev-home  <- Pfad des Repos (env.lua setzt damit ETUDE_HOME, PATH, QML_IMPORT_PATH)
+#   ~/.config/hypr/etude        -> default/hypr               (Etude-Defaults für Hyprland)
+#   ~/.config/hypr/hyprland.lua -> config/hypr/hyprland.lua   (deine Config, lädt die Defaults)
+#   ~/.config/kitty/etude.conf  -> default/kitty/kitty.conf   (Etude-Defaults für kitty)
+#   ~/.config/kitty/kitty.conf  -> config/kitty/kitty.conf    (deine Config, lädt etude.conf)
+#   Startmenü-Einträge und Icons nach ~/.local/share/{applications,icons}
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+link() {
+    local src="$1" dst="$2"
+    mkdir -p "$(dirname "$dst")"
+    if [ -e "$dst" ] && [ ! -L "$dst" ]; then
+        mv "$dst" "$dst.bak-$STAMP"
+        echo "Backup: $dst.bak-$STAMP"
+    fi
+    ln -sfn "$src" "$dst"
+    echo "Link:   $dst -> $src"
+}
+
+# Entwicklungsmodus: Repo-Pfad merken. ~/.local/share/etude ist ab jetzt für Nutzerdaten
+# (z. B. eigene Hintergründe) – der alte Symlink aufs Repo kommt weg.
+mkdir -p "$CFG/etude"
+echo "$REPO" > "$CFG/etude/dev-home"
+echo "Datei:  $CFG/etude/dev-home ($REPO)"
+if [ -L "$DATA/etude" ]; then
+    rm "$DATA/etude"
+    echo "Entfernt: alter Link $DATA/etude"
+fi
+
+link "$REPO/default/hypr"              "$CFG/hypr/etude"
+link "$REPO/config/hypr/hyprland.lua"  "$CFG/hypr/hyprland.lua"
+link "$REPO/default/kitty/kitty.conf"  "$CFG/kitty/etude.conf"
+link "$REPO/config/kitty/kitty.conf"   "$CFG/kitty/kitty.conf"
+
+# Startmenü-Einträge (.desktop) und Icons der Etude-Apps
+mkdir -p "$DATA/applications" "$DATA/icons/hicolor/scalable/apps"
+for tpl in "$REPO"/applications/*.desktop.in; do
+    out="$DATA/applications/$(basename "${tpl%.in}")"
+    sed "s|@BIN@|$REPO/bin|g" "$tpl" > "$out"
+    echo "Datei:  $out"
+done
+for icon in "$REPO"/applications/icons/*.svg; do
+    link "$icon" "$DATA/icons/hicolor/scalable/apps/$(basename "$icon")"
+done
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$DATA/icons/hicolor" 2>/dev/null || true
+
+echo
+echo "Fertig. Einmal neu anmelden, damit ETUDE_HOME, PATH und QML_IMPORT_PATH"
+echo "überall gesetzt sind (Paketbetrieb: rm ~/.config/etude/dev-home)."

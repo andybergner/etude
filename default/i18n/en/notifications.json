@@ -1,0 +1,12 @@
+{
+  "notifications.now": "Now",
+  "notifications.minutesAgo": "%1 min ago",
+  "notifications.dateTimeFormat": "M/d h:mm AP",
+  "notifications.system": "System",
+  "notifications.title": "Notifications",
+  "notifications.clearAll": "Clear all",
+  "notifications.dndOn": "Do not disturb is on",
+  "notifications.dnd": "Do not disturb",
+  "notifications.none": "No new notifications",
+  "notifications.noneDnd": "No new notifications\nDo not disturb is on"
+}

@@ -1,0 +1,131 @@
+#!/bin/sh
+# etude-open – Datei, Ordner oder URL mit der Standard-App öffnen (wie xdg-open)
+#
+# Im Unterschied zu xdg-open (ohne Desktop-Umgebung) startet es Apps mit Terminal=true – z. B. Neovim,
+# htop, ranger – in einem Terminal, statt sie ohne Fenster laufen zu lassen und dann auf den Browser
+# auszuweichen. In der Etude-Sitzung ersetzt es xdg-open (default/shim/xdg-open liegt vorne im PATH),
+# damit auch andere Programme (Browser-Downloads, Mail-Links …) dieselbe Standard-App nehmen.
+#
+# Ablauf: Mime-Typ → Standard-App aus mimeapps.list (xdg-mime) → Exec der .desktop-Datei.
+# Terminal: xdg-terminal-exec, sonst $TERMINAL, sonst kitty. Klappt etwas nicht → echtes xdg-open.
+#
+#   etude-open ~/notizen.txt     etude-open https://archlinux.org     etude-open ~/Bilder
+set -u
+
+real_xdg_open() {
+    for x in /usr/bin/xdg-open /usr/local/bin/xdg-open; do
+        [ -x "$x" ] && exec "$x" "$@"
+    done
+    echo "etude-open: no application for '$1'" >&2
+    exit 3
+}
+
+[ $# -ge 1 ] && [ -n "$1" ] || { echo "usage: etude-open FILE|DIRECTORY|URL" >&2; exit 1; }
+target=$1
+
+# file://… → Pfad (Prozent-Kodierung auflösen)
+case $target in
+    file://*)
+        p=${target#file://}; p=${p#localhost}
+        target=$(printf '%s' "$p" | LC_ALL=C awk '{
+            h = "0123456789abcdef"; o = ""
+            for (i = 1; i <= length($0); i++) {
+                c = substr($0, i, 1)
+                if (c == "%" && i + 2 <= length($0)) {
+                    a = index(h, tolower(substr($0, i + 1, 1))); b = index(h, tolower(substr($0, i + 2, 1)))
+                    if (a && b) { o = o sprintf("%c", (a - 1) * 16 + b - 1); i += 2; continue }
+                }
+                o = o c
+            }
+            printf "%s", o }')
+        ;;
+esac
+
+# Mime-Typ
+case $target in
+    [a-zA-Z]*:*)
+        scheme=${target%%:*}
+        case $scheme in
+            *[!a-zA-Z0-9+.-]*) mime="" ;;                 # kein URL-Schema (z. B. "C:…")
+            *) mime="x-scheme-handler/$(printf '%s' "$scheme" | tr 'A-Z' 'a-z')" ;;
+        esac
+        ;;
+    *) mime="" ;;
+esac
+if [ -z "$mime" ]; then
+    [ -e "$target" ] || { echo "etude-open: '$target' not found" >&2; exit 2; }
+    if [ -d "$target" ]; then mime="inode/directory"
+    else mime=$(xdg-mime query filetype "$target" 2>/dev/null)
+         [ -n "$mime" ] || mime=$(file -b --mime-type -- "$target" 2>/dev/null)
+    fi
+fi
+[ -n "$mime" ] || real_xdg_open "$@"
+
+# .desktop-Datei zu einer Desktop-ID suchen
+find_desktop() {
+    IFS=:
+    for d in "${XDG_DATA_HOME:-$HOME/.local/share}" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+        if [ -f "$d/applications/$1" ]; then unset IFS; printf '%s' "$d/applications/$1"; return 0; fi
+        sub=$(printf '%s' "$1" | sed 's|-|/|')       # kde-foo.desktop → kde/foo.desktop
+        if [ -f "$d/applications/$sub" ]; then unset IFS; printf '%s' "$d/applications/$sub"; return 0; fi
+    done
+    unset IFS
+    return 1
+}
+
+# Standard-App: zuerst selbst in den mimeapps.list-Dateien (Reihenfolge laut Spezifikation, dort
+# speichern auch die Einstellungen), sonst xdg-mime. Erste Desktop-ID, die es wirklich gibt.
+file=""
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+lists="$cfg/etude-mimeapps.list:$cfg/mimeapps.list:$(printf '%s' "${XDG_CONFIG_DIRS:-/etc/xdg}" | sed 's|\(:\|$\)|/mimeapps.list\1|g')"
+lists="$lists:$data/applications/mimeapps.list:$(printf '%s' "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" | sed 's|\(:\|$\)|/applications/mimeapps.list\1|g')"
+IFS=:
+for l in $lists; do
+    [ -f "$l" ] || continue
+    ids=$(awk -v m="$mime" '/^\[/ { g = ($0 == "[Default Applications]") } g && index($0, m "=") == 1 { print substr($0, length(m) + 2); exit }' "$l")
+    [ -n "$ids" ] || continue
+    unset IFS
+    for id in $(printf '%s' "$ids" | tr ';' ' '); do
+        f=$(find_desktop "$id") && { file=$f; break; }
+    done
+    IFS=:
+    [ -n "$file" ] && break
+done
+unset IFS
+if [ -z "$file" ]; then
+    desktop=$(xdg-mime query default "$mime" 2>/dev/null | head -n1)
+    [ -n "$desktop" ] && file=$(find_desktop "$desktop")
+fi
+[ -n "$file" ] || real_xdg_open "$@"
+
+# Exec und Terminal aus [Desktop Entry]
+exec_line=$(awk '/^\[/ { g = ($0 == "[Desktop Entry]") } g && /^Exec=/ { sub(/^Exec=/, ""); print; exit }' "$file")
+term=$(awk '/^\[/ { g = ($0 == "[Desktop Entry]") } g && /^Terminal=/ { sub(/^Terminal=/, ""); print; exit }' "$file")
+[ -n "$exec_line" ] || real_xdg_open "$@"
+
+# Platzhalter: %f %F %u %U → Ziel (sicher in einfachen Anführungszeichen), übrige entfernen
+quoted="'$(printf '%s' "$target" | sed "s/'/'\\\\''/g")'"
+strip() { printf '%s' "$1" | sed 's/%[a-zA-Z]//g; s/%%/%/g'; }
+code=""
+for c in %F %f %U %u; do
+    case $exec_line in *"$c"*) code=$c; break ;; esac
+done
+if [ -n "$code" ]; then
+    pre=${exec_line%%"$code"*}; post=${exec_line#*"$code"}
+    cmd="$(strip "$pre")$quoted$(strip "$post")"
+else
+    cmd="$(strip "$exec_line") $quoted"
+fi
+
+if [ "$term" = "true" ]; then
+    if command -v xdg-terminal-exec >/dev/null 2>&1; then set -- xdg-terminal-exec sh -c "$cmd"
+    elif [ -n "${TERMINAL:-}" ] && command -v "${TERMINAL%% *}" >/dev/null 2>&1; then set -- $TERMINAL -e sh -c "$cmd"
+    else set -- kitty -e sh -c "$cmd"
+    fi
+else
+    set -- sh -c "$cmd"
+fi
+if command -v setsid >/dev/null 2>&1; then exec setsid -f "$@" >/dev/null 2>&1 </dev/null
+fi
+"$@" >/dev/null 2>&1 </dev/null &

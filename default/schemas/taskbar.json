@@ -1,0 +1,42 @@
+{
+  "position": {
+    "type": "enum",
+    "choices": [
+      "bottom",
+      "top"
+    ],
+    "default": "bottom",
+    "summary": "Taskbar position"
+  },
+  "layout": {
+    "type": "object",
+    "default": {
+      "left": [
+        "start",
+        "workspaces"
+      ],
+      "center": [],
+      "right": [
+        "network",
+        "bluetooth",
+        "sound",
+        "battery",
+        "notifications",
+        "clock"
+      ],
+      "hidden": [
+        "apps"
+      ]
+    },
+    "summary": "Items per taskbar zone (left, center, right, hidden)"
+  },
+  "pinned": {
+    "type": "list",
+    "default": [
+      "com.etude.files",
+      "kitty",
+      "com.etude.settings"
+    ],
+    "summary": "Pinned apps (desktop IDs)"
+  }
+}

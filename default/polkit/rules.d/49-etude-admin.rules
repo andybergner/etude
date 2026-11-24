@@ -1,0 +1,8 @@
+// Etude: Wer in der Benutzerkontensteuerung als Administrator bestätigen darf.
+// Standard bei Arch (50-default.rules): nur Mitglieder der Gruppe wheel.
+// Diese Datei ergänzt root. Sie muss vor 50-default.rules liegen, weil polkit
+// die erste addAdminRule nimmt, die etwas zurückgibt.
+// Installieren: sudo install -m644 49-etude-admin.rules /etc/polkit-1/rules.d/
+polkit.addAdminRule(function (action, subject) {
+    return ["unix-group:wheel", "unix-user:root"];
+});

@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Name[de]=Einstellungen
+GenericName=System settings
+GenericName[de]=Systemeinstellungen
+Comment=Network, sound, personalization, time & language and more
+Comment[de]=Netzwerk, Sound, Personalisierung, Zeit & Sprache und mehr
+Exec=@BIN@/etude-settings
+Icon=com.etude.settings
+StartupWMClass=com.etude.settings
+Terminal=false
+Categories=Settings;System;
+Keywords=Settings;System;Network;Wi-Fi;Sound;Background;Colors;Taskbar;Language;Keyboard;About;
+Keywords[de]=Einstellungen;Settings;System;Netzwerk;WLAN;Sound;Hintergrund;Farben;Taskleiste;Sprache;Tastatur;Info;
+StartupNotify=false

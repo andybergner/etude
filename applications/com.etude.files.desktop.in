@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Name=File Explorer
+Name[de]=Explorer
+GenericName=File manager
+GenericName[de]=Dateimanager
+Comment=Browse files and folders
+Comment[de]=Dateien und Ordner durchsuchen
+Exec=@BIN@/etude-files %U
+Icon=com.etude.files
+StartupWMClass=com.etude.files
+Terminal=false
+Categories=System;FileManager;Utility;
+MimeType=inode/directory;
+Keywords=Explorer;Files;Folders;File manager;
+Keywords[de]=Explorer;Dateien;Ordner;Dateimanager;Files;Folder;
+StartupNotify=false
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New window
+Name[de]=Neues Fenster
+Exec=@BIN@/etude-files --new-window

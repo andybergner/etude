@@ -1,0 +1,14 @@
+{
+  "nightLight": {
+    "type": "bool",
+    "default": false,
+    "summary": "Night light (warmer colors)"
+  },
+  "nightTemp": {
+    "type": "int",
+    "min": 1000,
+    "max": 6500,
+    "default": 4000,
+    "summary": "Night light color temperature in Kelvin"
+  }
+}

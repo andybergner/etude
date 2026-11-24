@@ -1,0 +1,8 @@
+module Etude.Menus
+NetworkMenu 1.0 NetworkMenu.qml
+BluetoothMenu 1.0 BluetoothMenu.qml
+SoundMenu 1.0 SoundMenu.qml
+BatteryMenu 1.0 BatteryMenu.qml
+MenuPage 1.0 MenuPage.qml
+ListRow 1.0 ListRow.qml
+SectionLabel 1.0 SectionLabel.qml

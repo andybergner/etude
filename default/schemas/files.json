@@ -1,0 +1,12 @@
+{
+  "pinned": {
+    "type": "list",
+    "default": [],
+    "summary": "Folders pinned to Quick access (paths)"
+  },
+  "details": {
+    "type": "bool",
+    "default": false,
+    "summary": "Show the details pane"
+  }
+}

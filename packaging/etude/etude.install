@@ -1,0 +1,27 @@
+# Der Etude-Anmeldebildschirm (greetd) gehört fest zum System: bei Installation und Update aktivieren.
+_enable_greeter() {
+    systemctl enable --force greetd.service >/dev/null 2>&1 || \
+        echo ">> greetd konnte nicht aktiviert werden: sudo systemctl enable --force greetd.service"
+}
+
+# Dienste für Bluetooth und Energiemodus (Einstellungen, Leiste) – wie bei Windows von Anfang an an
+_enable_services() {
+    systemctl enable bluetooth.service power-profiles-daemon.service >/dev/null 2>&1 || \
+        echo ">> Dienste konnten nicht aktiviert werden: sudo systemctl enable --now bluetooth power-profiles-daemon"
+}
+
+post_install() {
+    _enable_greeter
+    _enable_services
+    echo ">> Etude ist installiert. Nach dem Neustart erscheint der Etude-Anmeldebildschirm."
+    echo ">> Notausgang: Strg+Alt+F2, anmelden, dann: sudo systemctl disable greetd"
+}
+
+post_upgrade() {
+    _enable_greeter
+    echo ">> Etude wurde aktualisiert. Neue Einstellungen und Migrationen gelten nach dem nächsten Anmelden."
+}
+
+pre_remove() {
+    systemctl disable greetd.service >/dev/null 2>&1 || true
+}

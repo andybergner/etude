@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+# makepkg
+packaging/*/src/
+packaging/*/pkg/
+packaging/*/etude/
+*.pkg.tar.zst
+iso/out/

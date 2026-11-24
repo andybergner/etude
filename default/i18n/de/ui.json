@@ -1,0 +1,32 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Abbrechen",
+  "common.save": "Speichern",
+  "common.apply": "Übernehmen",
+  "common.close": "Schließen",
+  "common.delete": "Löschen",
+  "common.remove": "Entfernen",
+  "common.add": "Hinzufügen",
+  "common.edit": "Bearbeiten",
+  "common.rename": "Umbenennen",
+  "common.open": "Öffnen",
+  "common.back": "Zurück",
+  "common.next": "Weiter",
+  "common.yes": "Ja",
+  "common.no": "Nein",
+  "common.on": "Ein",
+  "common.off": "Aus",
+  "common.search": "Suchen",
+  "common.searchEllipsis": "Suchen …",
+  "common.select": "Auswählen …",
+  "common.noResults": "Nichts gefunden",
+  "common.loading": "Wird geladen …",
+  "common.settings": "Einstellungen",
+  "common.calendarWeek": "KW",
+  "common.durationHoursMinutes": "%1 Std. %2 Min.",
+  "common.durationMinutes": "%1 Min.",
+  "common.items": {
+    "one": "%1 Element",
+    "other": "%1 Elemente"
+  }
+}

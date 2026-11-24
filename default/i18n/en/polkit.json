@@ -1,0 +1,16 @@
+{
+  "polkit.notAllowed": "“%1” is not allowed to confirm this.",
+  "polkit.allowed": "Allowed: %1",
+  "polkit.wrongCredentials": "The user name or password is incorrect.",
+  "polkit.title": "User Account Control",
+  "polkit.question": "Do you want to allow this app to make changes to your device?",
+  "polkit.signInAdmin": "Sign in with an administrator account to continue.",
+  "polkit.systemAction": "System action",
+  "polkit.runAsAdmin": "Runs as administrator",
+  "polkit.hideDetails": "Hide details",
+  "polkit.showDetails": "Show details",
+  "polkit.command": "Command: %1",
+  "polkit.action": "Action: %1",
+  "polkit.userName": "User name",
+  "polkit.password": "Password"
+}

@@ -1,0 +1,142 @@
+#!/bin/sh
+# etude-config – Etude-Einstellungen lesen und schreiben (wie reg / gsettings)
+#
+#   etude-config domains                    Bereiche mit Schema auflisten
+#   etude-config list <domain>              wirksame Werte (JSON)
+#   etude-config describe <domain>          Schema: Typ, Standard, Beschreibung
+#   etude-config get <domain> <key>         einen Wert lesen (JSON)
+#   etude-config set <domain> <key> <wert>  setzen; <wert> als JSON (true, 5, "text", [..]) oder Text
+#   etude-config reset <domain> [key]       auf den Standard zurück (ohne key: ganzer Bereich)
+#   etude-config migrate                    alte settings.json auf die Bereiche verteilen (einmalig)
+#
+# Ebenen (die untere gewinnt): Schema-Standard → /etc/etude/settings/<domain>.json → Nutzer.
+# Nutzerdateien enthalten nur Abweichungen vom Standard und werden atomar ersetzt.
+set -eu
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+USER_DIR="$CONFIG_HOME/etude/settings"
+ADMIN_DIR="/etc/etude/settings"
+SELF_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+# Schemas: Etude in default/schemas (Repo bzw. /usr/share/etude/default/schemas),
+# eigenständige Apps legen ihre nach /usr/share/etude/schemas
+SCHEMA_DIRS="${ETUDE_HOME:-}/default/schemas $SELF_DIR/../default/schemas /usr/share/etude/default/schemas /usr/share/etude/schemas"
+schema_file() {
+    for d in $SCHEMA_DIRS; do [ -f "$d/$1.json" ] && { echo "$d/$1.json"; return 0; }; done
+    return 1
+}
+# alle Bereiche (jeder Name einmal, der erste Fund zählt)
+domains() {
+    for d in $SCHEMA_DIRS; do
+        for f in "$d"/*.json; do [ -e "$f" ] && basename "$f" .json; done
+    done | awk '!seen[$0]++'
+}
+
+die() { echo "etude-config: $*" >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || die "jq is missing"
+readj() { if [ -s "$1" ]; then jq -c 'if type == "object" then . else {} end' "$1" 2>/dev/null || echo '{}'; else echo '{}'; fi; }
+schema() { f=$(schema_file "$1") && readj "$f" || echo '{}'; }
+admin()  { readj "$ADMIN_DIR/$1.json"; }
+user()   { readj "$USER_DIR/$1.json"; }
+valid_domain() { case "$1" in ''|*/*|.*) die "invalid domain: $1";; esac; }
+
+# Nutzerdatei atomar ersetzen: neues JSON auf stdin
+write_user() {
+    mkdir -p "$USER_DIR"
+    tmp=$(mktemp "$USER_DIR/.$1.XXXXXX")
+    jq . > "$tmp" && mv -f "$tmp" "$USER_DIR/$1.json"
+}
+
+# Wirksame Werte: Standard ← Admin ← Nutzer (gesperrte Schlüssel bleiben beim Admin)
+merged() {
+    jq -n --argjson s "$(schema "$1")" --argjson a "$(admin "$1")" --argjson u "$(user "$1")" '
+        ($s | with_entries(.value |= .default)) + ($a.values // {}) as $def
+        | ($a.locked // []) as $lock
+        | $def + ($u | with_entries(select(.key as $k | $lock | index($k) | not)))'
+}
+
+cmd=${1:-}; [ $# -gt 0 ] && shift
+case "$cmd" in
+domains)
+    domains
+    ;;
+list)
+    [ $# -eq 1 ] || die "usage: list <domain>"; valid_domain "$1"
+    merged "$1"
+    ;;
+describe)
+    [ $# -eq 1 ] || die "usage: describe <domain>"; valid_domain "$1"
+    schema "$1" | jq -r 'to_entries[] | "\(.key)\t\(.value.type)\tdefault: \(.value.default | tojson)\t\(.value.summary // "")"'
+    ;;
+get)
+    [ $# -eq 2 ] || die "usage: get <domain> <key>"; valid_domain "$1"
+    merged "$1" | jq --arg k "$2" '.[$k]'
+    ;;
+set)
+    [ $# -eq 3 ] || die "usage: set <domain> <key> <value>"; valid_domain "$1"
+    d=$1 k=$2
+    v=$(printf '%s' "$3" | jq -c . 2>/dev/null) || v=$(jq -nc --arg v "$3" '$v')
+    admin "$d" | jq -e --arg k "$k" '(.locked // []) | index($k) | not' >/dev/null || die "$d.$k is locked by the administrator"
+    # Typ prüfen, wenn das Schema den Schlüssel kennt
+    schema "$d" | jq -e --arg k "$k" --argjson v "$v" '
+        .[$k] as $s | if $s == null then true else
+        ($v | type) as $t |
+        if   $s.type == "bool"   then $t == "boolean"
+        elif $s.type == "int"    then $t == "number" and ($v | floor) == $v and ($s.min == null or $v >= $s.min) and ($s.max == null or $v <= $s.max)
+        elif $s.type == "real"   then $t == "number" and ($s.min == null or $v >= $s.min) and ($s.max == null or $v <= $s.max)
+        elif $s.type == "string" then $t == "string"
+        elif $s.type == "color"  then $t == "string" and ($v == "" or ($v | test("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")))
+        elif $s.type == "enum"   then ($s.choices // []) | index([$v]) != null
+        elif $s.type == "list"   then $t == "array"
+        elif $s.type == "object" then $t == "object"
+        else true end end' >/dev/null || die "invalid value for $d.$k: $v"
+    # Gleich dem Standard → Schlüssel entfernen (dem Standard folgen)
+    def=$(jq -n --argjson s "$(schema "$d")" --argjson a "$(admin "$d")" --arg k "$k" '($a.values // {})[$k] // $s[$k].default')
+    user "$d" | jq --arg k "$k" --argjson v "$v" --argjson def "$def" \
+        'if $v == $def then del(.[$k]) else .[$k] = $v end' | write_user "$d"
+    ;;
+reset)
+    [ $# -ge 1 ] || die "usage: reset <domain> [key]"; valid_domain "$1"
+    if [ $# -ge 2 ]; then user "$1" | jq --arg k "$2" 'del(.[$k])' | write_user "$1"
+    else echo '{}' | write_user "$1"; fi
+    ;;
+migrate)
+    # Alte Einzeldatei (~/.config/etude/settings.json) auf die Bereiche verteilen.
+    # Werte, die dem Standard entsprechen, werden nicht übernommen. Danach: settings.json.migrated
+    old="$CONFIG_HOME/etude/settings.json"
+    mkdir -p "$USER_DIR"
+    if [ -f "$old" ]; then
+        map='{
+          "dark": ["appearance","dark"], "accent": ["appearance","accent"], "transparency": ["appearance","transparency"],
+          "wallpaperMode": ["appearance","wallpaperMode"], "wallpaperColor": ["appearance","wallpaperColor"], "wallpaper": ["appearance","wallpaper"],
+          "barPosition": ["taskbar","position"], "barLayout": ["taskbar","layout"], "barPinned": ["taskbar","pinned"],
+          "clock24": ["time","clock24"], "clockSeconds": ["time","clockSeconds"],
+          "idleAcLock": ["power","idleAcLock"], "idleAcScreen": ["power","idleAcScreen"], "idleAcSuspend": ["power","idleAcSuspend"],
+          "idleBatLock": ["power","idleBatLock"], "idleBatScreen": ["power","idleBatScreen"], "idleBatSuspend": ["power","idleBatSuspend"],
+          "lockOnSuspend": ["power","lockOnSuspend"],
+          "nightLight": ["display","nightLight"], "nightTemp": ["display","nightTemp"],
+          "notifyEnabled": ["notifications","enabled"], "notifyDnd": ["notifications","dnd"], "notifyBanners": ["notifications","banners"],
+          "notifySound": ["notifications","sound"], "notifyMuted": ["notifications","muted"], "notifyApps": ["notifications","apps"],
+          "filesPinned": ["files","pinned"], "filesDetails": ["files","details"]
+        }'
+        o=$(readj "$old")
+        for d in $(echo "$map" | jq -r '[.[][0]] | unique[]'); do
+            new=$(jq -n --argjson o "$o" --argjson map "$map" --argjson s "$(schema "$d")" --argjson u "$(user "$d")" --arg d "$d" '
+                reduce ($map | to_entries[] | select(.value[0] == $d)) as $e ({};
+                    if ($o | has($e.key)) and $o[$e.key] != $s[$e.value[1]].default
+                    then .[$e.value[1]] = $o[$e.key] else . end)
+                + $u')
+            echo "$new" | write_user "$d"
+        done
+        mv -f "$old" "$old.migrated"
+        echo "etude-config: migrated $old" >&2
+    fi
+    # Für jeden Bereich eine (leere) Datei anlegen, damit laufende Programme Änderungen sofort sehen
+    for d in $(domains); do
+        [ -e "$USER_DIR/$d.json" ] || echo '{}' | write_user "$d"
+    done
+    ;;
+*)
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    [ -z "$cmd" ] || exit 1
+    ;;
+esac

@@ -1,0 +1,54 @@
+#!/bin/sh
+# Startet die XDG-Autostart-Einträge (~/.config/autostart, /etc/xdg/autostart) beim Anmelden.
+# Hyprland kennt XDG-Autostart nicht selbst – deshalb ruft autostart.lua dieses Skript auf.
+# Beachtet: Hidden=true, OnlyShowIn/NotShowIn (Hyprland, Etude), TryExec.
+# Verwaltet wird der Autostart in den Einstellungen unter Apps › Autostart.
+
+DESKTOPS="Hyprland Etude"
+dirs="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+IFS=:; for d in ${XDG_CONFIG_DIRS:-/etc/xdg}; do dirs="$dirs:$d/autostart"; done; unset IFS
+
+seen=" "
+IFS=:; set -- $dirs; unset IFS
+for d in "$@"; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*.desktop; do
+        [ -f "$f" ] || continue
+        id=${f##*/}
+        case "$seen" in *" $id "*) continue ;; esac      # Benutzerdatei hat Vorrang
+        seen="$seen$id "
+
+        line=$(awk '
+            /^\[/ { sec = $0; next }
+            sec != "[Desktop Entry]" { next }
+            { i = index($0, "="); if (!i) next; k = substr($0, 1, i - 1); v = substr($0, i + 1) }
+            k == "Exec" { exec = v } k == "Hidden" { hidden = v } k == "TryExec" { tryexec = v }
+            k == "OnlyShowIn" { only = v } k == "NotShowIn" { notin = v } k == "Type" { type = v }
+            END { printf "%s\037%s\037%s\037%s\037%s\037%s", hidden, only, notin, tryexec, type, exec }' "$f")
+
+        hidden=$(printf '%s' "$line" | cut -d"$(printf '\037')" -f1)
+        only=$(printf '%s' "$line"   | cut -d"$(printf '\037')" -f2)
+        notin=$(printf '%s' "$line"  | cut -d"$(printf '\037')" -f3)
+        tryexec=$(printf '%s' "$line" | cut -d"$(printf '\037')" -f4)
+        type=$(printf '%s' "$line"   | cut -d"$(printf '\037')" -f5)
+        exec=$(printf '%s' "$line"   | cut -d"$(printf '\037')" -f6-)
+
+        [ "$hidden" = true ] && continue
+        [ -n "$type" ] && [ "$type" != Application ] && continue
+        [ -z "$exec" ] && continue
+
+        if [ -n "$only" ]; then
+            ok=0; for x in $DESKTOPS; do case ";$only;" in *";$x;"*) ok=1 ;; esac; done
+            [ $ok = 1 ] || continue
+        fi
+        skip=0; for x in $DESKTOPS; do case ";$notin;" in *";$x;"*) skip=1 ;; esac; done
+        [ $skip = 1 ] && continue
+        if [ -n "$tryexec" ]; then command -v "$tryexec" >/dev/null 2>&1 || continue; fi
+
+        # Platzhalter (%u, %F, …) entfernen, %% → %
+        cmd=$(printf '%s' "$exec" | sed -e 's/%[fFuUdDnNickvm]//g' -e 's/%%/%/g')
+        echo "etude-autostart: $id"
+        setsid -f sh -c "$cmd" >/dev/null 2>&1
+    done
+done
+exit 0

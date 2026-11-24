@@ -1,0 +1,12 @@
+{
+  "clock24": {
+    "type": "bool",
+    "default": true,
+    "summary": "24-hour clock"
+  },
+  "clockSeconds": {
+    "type": "bool",
+    "default": false,
+    "summary": "Show seconds in the taskbar clock"
+  }
+}

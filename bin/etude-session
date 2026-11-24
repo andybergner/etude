@@ -1,0 +1,12 @@
+#!/bin/sh
+# Startet die Sitzung „Etude“: erst einrichten/migrieren (etude-setup), dann Hyprland.
+# Wird vom Login-Manager aufgerufen (/usr/share/wayland-sessions/etude.desktop) oder auf der Konsole.
+# Ausgabe ins Log statt auf die Konsole: ~/.local/state/etude/session.log (vorige: session.log.old)
+logdir="${XDG_STATE_HOME:-$HOME/.local/state}/etude"
+mkdir -p "$logdir"
+[ -f "$logdir/session.log" ] && mv -f "$logdir/session.log" "$logdir/session.log.old"
+exec >"$logdir/session.log" 2>&1
+
+etude-setup || echo "etude-setup failed – starting anyway"
+if command -v start-hyprland >/dev/null 2>&1; then exec start-hyprland "$@"; fi
+exec Hyprland "$@"

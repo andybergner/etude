@@ -1,0 +1,6 @@
+# Pakete aus dem AUR, die .github/workflows/aur.yml ins [etude]-Repo baut (ein Name pro Zeile).
+# Abhängigkeiten aus dem AUR baut der Workflow automatisch mit.
+
+# Bootmenü: Einträge automatisch (limine-update) und Schnappschüsse im Bootmenü – install/etude-boot.packages
+limine-mkinitcpio-hook
+limine-snapper-sync

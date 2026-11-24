@@ -1,0 +1,19 @@
+{
+  "lock.dateFormat": "dddd, d. MMMM",
+  "lock.checking": "Wird geprüft …",
+  "lock.password": "Kennwort",
+  "lock.wrongPassword": "Das Kennwort ist falsch. Versuchen Sie es erneut.",
+  "lock.sleep": "Energiesparmodus",
+  "lock.restart": "Neu starten",
+  "lock.shutDown": "Herunterfahren",
+  "lock.otherUser": "Anderer Benutzer",
+  "lock.userName": "Benutzername",
+  "lock.capsLock": "Die Feststelltaste ist aktiviert.",
+  "lock.signIn": "Anmelden",
+  "lock.unlock": "Entsperren",
+  "lock.wifi": "WLAN: %1",
+  "lock.ethernet": "Ethernet: verbunden",
+  "lock.offline": "Nicht verbunden",
+  "lock.battery": "Akku: %1",
+  "lock.power": "Ein/Aus"
+}

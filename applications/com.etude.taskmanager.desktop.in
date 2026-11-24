@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Task Manager
+Name[de]=Task-Manager
+GenericName=Processes and performance
+GenericName[de]=Prozesse und Leistung
+Comment=Running apps, processes, performance, startup apps and services
+Comment[de]=Laufende Apps, Prozesse, Leistung, Autostart und Dienste
+Exec=@BIN@/etude-taskmanager
+Icon=com.etude.taskmanager
+StartupWMClass=com.etude.taskmanager
+Terminal=false
+Categories=System;Monitor;
+Keywords=Task Manager;Taskmanager;Processes;Performance;CPU;RAM;Memory;Services;End task;
+Keywords[de]=Task-Manager;Taskmanager;Prozesse;Leistung;CPU;RAM;Arbeitsspeicher;Dienste;beenden;
+StartupNotify=false

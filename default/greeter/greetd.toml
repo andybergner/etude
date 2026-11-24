@@ -1,0 +1,8 @@
+# Etude – greetd-Konfiguration (kommt mit dem Paket; /etc/greetd/config.toml bleibt unberührt).
+# greetd wird über /usr/lib/systemd/system/greetd.service.d/etude.conf auf diese Datei umgestellt.
+[terminal]
+vt = 1
+
+[default_session]
+command = "etude-greeter"
+user = "greeter"

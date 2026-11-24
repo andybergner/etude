@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Startet die Etude-Shell neu – funktioniert in kitty in der VM UND per SSH.
+# Sucht sich die laufende Hyprland-Sitzung selbst.
+set -euo pipefail
+
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+# Wayland-Display der laufenden Sitzung (z. B. wayland-1)
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    sock=$(ls "$XDG_RUNTIME_DIR"/wayland-? 2>/dev/null | head -1 || true)
+    [ -n "$sock" ] || { echo "Kein Wayland gefunden – läuft Hyprland im VM-Fenster?"; exit 1; }
+    export WAYLAND_DISPLAY="$(basename "$sock")"
+fi
+
+# Hyprland-Instanz (für Workspaces & Co.)
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    export HYPRLAND_INSTANCE_SIGNATURE="$(ls -t "$XDG_RUNTIME_DIR/hypr" | head -1)"
+fi
+
+# Immer das Repo, in dem dieses Skript liegt
+export ETUDE_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+export QML_IMPORT_PATH="$ETUDE_HOME/qml"
+export PATH="$ETUDE_HOME/bin:$PATH"
+export QT_QPA_PLATFORM=wayland
+
+pkill -x qs 2>/dev/null || true
+pkill -x quickshell 2>/dev/null || true
+sleep 0.3
+exec qs -p "$ETUDE_HOME/shell"

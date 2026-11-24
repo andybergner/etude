@@ -1,0 +1,12 @@
+{
+  "notifications.now": "Jetzt",
+  "notifications.minutesAgo": "vor %1 Min.",
+  "notifications.dateTimeFormat": "dd.MM. HH:mm",
+  "notifications.system": "System",
+  "notifications.title": "Benachrichtigungen",
+  "notifications.clearAll": "Alle löschen",
+  "notifications.dndOn": "Nicht stören ist an",
+  "notifications.dnd": "Nicht stören",
+  "notifications.none": "Keine neuen Benachrichtigungen",
+  "notifications.noneDnd": "Keine neuen Benachrichtigungen\nNicht stören ist aktiviert"
+}

@@ -1,0 +1,15 @@
+{
+  "startmenu.signOut": "Sign out",
+  "startmenu.restart": "Restart",
+  "startmenu.shutDown": "Shut down",
+  "startmenu.terminal": "Terminal",
+  "startmenu.taskManager": "Task Manager",
+  "startmenu.taskManagerShortcut": "Ctrl ⇧ Esc",
+  "startmenu.settings": "Settings",
+  "startmenu.explorer": "File Explorer",
+  "startmenu.shutDownOrSignOut": "Shut down or sign out",
+  "startmenu.user": "User",
+  "startmenu.searchApps": "Search apps",
+  "startmenu.noResults": "No results for “%1”",
+  "startmenu.noApps": "No apps found"
+}

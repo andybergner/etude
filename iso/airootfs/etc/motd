@@ -1,0 +1,7 @@
+Etude – Installationsmedium
+
+  etude-install      Etude installieren (startet auf tty1 automatisch)
+  nmtui              Netzwerk einrichten
+  Alt+F2             weitere Konsole
+
+Protokoll der Installation: /tmp/etude-install.log

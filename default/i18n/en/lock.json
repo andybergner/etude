@@ -1,0 +1,19 @@
+{
+  "lock.dateFormat": "dddd, MMMM d",
+  "lock.checking": "Checking …",
+  "lock.password": "Password",
+  "lock.wrongPassword": "The password is incorrect. Try again.",
+  "lock.sleep": "Sleep",
+  "lock.restart": "Restart",
+  "lock.shutDown": "Shut down",
+  "lock.otherUser": "Other user",
+  "lock.userName": "User name",
+  "lock.capsLock": "Caps Lock is on.",
+  "lock.signIn": "Sign in",
+  "lock.unlock": "Unlock",
+  "lock.wifi": "Wi-Fi: %1",
+  "lock.ethernet": "Ethernet: connected",
+  "lock.offline": "Not connected",
+  "lock.battery": "Battery: %1",
+  "lock.power": "Power"
+}

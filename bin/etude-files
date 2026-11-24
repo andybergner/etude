@@ -1,0 +1,42 @@
+#!/bin/sh
+# Öffnet den Etude-Explorer (App-ID: com.etude.files), optional in einem Ordner:
+#   etude-files                 -> Start
+#   etude-files ~/Downloads     -> Ordner
+#   etude-files file:///tmp     -> auch als URI (z. B. aus xdg-open)
+# Eine Datei als Argument öffnet ihren Ordner und wählt sie aus.
+# Läuft der Explorer schon, kommt sein Fenster nach vorne (mit Ordner: in einem neuen Tab).
+#   etude-files --new-window [ordner]   -> immer ein eigenes Fenster
+APP_ID="com.etude.files"
+# Wo Etude liegt: ETUDE_HOME, sonst das Repo (Entwicklung), sonst das Paket
+SELF_DIR=$(dirname "$(readlink -f "$0")")
+if [ -z "${ETUDE_HOME:-}" ]; then
+    if [ -f "$SELF_DIR/../shell/shell.qml" ]; then ETUDE_HOME=$(cd "$SELF_DIR/.." && pwd); else ETUDE_HOME=/usr/share/etude; fi
+fi
+export ETUDE_HOME
+# Repo-Module vor den installierten (nur in der Entwicklung gibt es $ETUDE_HOME/qml)
+[ -d "$ETUDE_HOME/qml" ] && export QML_IMPORT_PATH="$ETUDE_HOME/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+
+new=0
+[ "${1:-}" = "--new-window" ] && { new=1; shift; }
+target="${1:-}"
+case "$target" in
+    file://*) target=$(printf '%b' "$(printf '%s' "${target#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')") ;;
+esac
+select=""
+if [ -n "$target" ]; then
+    if [ -e "$target" ] && [ ! -d "$target" ]; then
+        select=$(cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target")
+        target=$(dirname "$target")
+    fi
+    target=$(cd "$target" 2>/dev/null && pwd) || target=""
+fi
+
+# schon offen? → per IPC (Tab öffnen) und Fenster nach vorne holen
+if [ $new = 0 ] && hyprctl clients 2>/dev/null | grep -q "class: $APP_ID\$"; then
+    if qs ipc -n -p "$ETUDE_HOME/apps/files" call files open "$target" "$select" >/dev/null 2>&1; then
+        hyprctl dispatch "hl.dsp.focus({ window = \"class:^($APP_ID)\$\" })" >/dev/null 2>&1
+        exit 0
+    fi
+fi
+
+QS_APP_ID="$APP_ID" ETUDE_APP_ID="$APP_ID" ETUDE_FILES_PATH="$target" ETUDE_FILES_SELECT="$select" setsid -f qs -p "$ETUDE_HOME/apps/files" >/dev/null 2>&1

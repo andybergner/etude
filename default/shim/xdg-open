@@ -1,0 +1,4 @@
+#!/bin/sh
+# In der Etude-Sitzung liegt dieser Ordner vorne im PATH (hypr/etude/env.lua):
+# xdg-open → etude-open (startet Terminal-Apps wie Neovim im Terminal, sonst wie xdg-open).
+exec etude-open "$@"

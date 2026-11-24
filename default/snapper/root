@@ -1,0 +1,8 @@
+# Etude: Schnappschüsse nur vor/nach Updates (snap-pac), keine stündlichen – 5 werden behalten.
+# install/config/snapper.sh überträgt diese Werte in /etc/snapper/configs/root.
+NUMBER_CLEANUP="yes"
+NUMBER_MIN_AGE="0"
+NUMBER_LIMIT="5"
+NUMBER_LIMIT_IMPORTANT="5"
+TIMELINE_CREATE="no"
+TIMELINE_CLEANUP="yes"

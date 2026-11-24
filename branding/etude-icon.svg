@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Etude App-Icon: eckiges O, diagonal geteilt, auf dunkler Kachel -->
+  <defs>
+    <clipPath id="upper"><polygon points="0,0 512,0 0,512"/></clipPath>
+    <clipPath id="lower"><polygon points="512,0 512,512 0,512"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="42" fill="#1a1b26"/>
+  <path clip-path="url(#upper)" fill="#c0caf5" fill-rule="evenodd"
+        d="M120.5 120.5 H391.5 V391.5 H120.5 Z M186.7 186.7 V325.3 H325.3 V186.7 Z"/>
+  <path clip-path="url(#lower)" fill="#7aa2f7" fill-rule="evenodd"
+        d="M120.5 120.5 H391.5 V391.5 H120.5 Z M186.7 186.7 V325.3 H325.3 V186.7 Z"/>
+  <line x1="481.9" y1="30.1" x2="30.1" y2="481.9" stroke="#1a1b26" stroke-width="36"/>
+</svg>

@@ -1,0 +1,76 @@
+import QtQuick
+
+// Schieberegler (shadcn: Slider): Spur h-1.5 bg-muted, Bereich bg-primary,
+// Griff size-4 rund, bg-background mit Rand in primary, Fokus-Ring beim Ziehen.
+Item {
+    id: root
+
+    property real value: 0.5          // 0..1
+    property real step: 0.01
+    property bool enabled_: true
+
+    signal moved(real value)          // beim Ziehen/Klicken (nicht bei Änderung von außen)
+
+    implicitWidth: 200
+    implicitHeight: 20
+    opacity: enabled_ ? 1 : 0.5
+
+    // Tastatur: Tab erreicht den Regler, Links/Rechts ändern in 5-%-Schritten (Hoch/Runter bleibt für die Navigation), Pos1/Ende springen an den Rand
+    activeFocusOnTab: enabled_
+    readonly property bool ownFocusRing: true           // FocusRoot zeichnet keinen zusätzlichen Ring
+    function nudge(d) { moved(Math.max(0, Math.min(1, Math.round((value + d) / step) * step))) }
+    Keys.onLeftPressed: nudge(-0.05)
+    Keys.onRightPressed: nudge(0.05)
+    Keys.onPressed: (e) => {
+        if (e.key === Qt.Key_Home) { moved(0); e.accepted = true }
+        else if (e.key === Qt.Key_End) { moved(1); e.accepted = true }
+        else FocusNav.key(root, e)                       // Hoch/Runter: zum Nachbarn
+    }
+    readonly property bool keyboardFocus: activeFocus   // Klicks geben keinen Fokus – Fokus heißt hier Tastatur
+
+    readonly property real knob: 16
+    readonly property real pos: Math.max(0, Math.min(1, value)) * (width - knob)
+
+    Rectangle {                       // Spur
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width; height: 6; radius: 3
+        color: Theme.muted
+        Rectangle {                   // gefüllter Bereich
+            width: root.pos + root.knob / 2
+            height: parent.height; radius: 3
+            color: Theme.primary
+        }
+    }
+
+    Rectangle {                       // Fokus-/Drag-Ring
+        visible: mouse.pressed || mouse.containsMouse || root.keyboardFocus
+        x: root.pos - 4; anchors.verticalCenter: parent.verticalCenter
+        width: root.knob + 8; height: width; radius: width / 2
+        color: Theme.alpha(Theme.ring, root.keyboardFocus ? 0.55 : 0.3)
+    }
+
+    Rectangle {                       // Griff
+        x: root.pos; anchors.verticalCenter: parent.verticalCenter
+        width: root.knob; height: root.knob; radius: root.knob / 2
+        color: Theme.background
+        border.width: 1
+        border.color: Theme.primary
+    }
+
+    MouseArea {
+        cursorShape: Qt.PointingHandCursor
+        id: mouse
+        anchors.fill: parent
+        anchors.margins: -4
+        enabled: root.enabled_
+        hoverEnabled: true
+        function update(mx) {
+            let v = Math.max(0, Math.min(1, (mx - 4 - root.knob / 2) / (root.width - root.knob)))
+            v = Math.round(v / root.step) * root.step
+            root.moved(v)
+        }
+        onPressed: (e) => update(e.x)
+        onPositionChanged: (e) => { if (pressed) update(e.x) }
+        onWheel: (e) => root.moved(Math.max(0, Math.min(1, root.value + (e.angleDelta.y > 0 ? 0.05 : -0.05))))
+    }
+}

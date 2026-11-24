@@ -1,0 +1,7 @@
+# Bootmenü-Werkzeuge aus dem [etude]-Repo (gebaut aus dem AUR, siehe .github/workflows/aur.yml):
+#   limine-mkinitcpio-hook  limine-update: schreibt die Einträge in /boot/limine.conf bei jedem
+#                           Kernel-Update selbst (Einstellungen: /etc/default/limine + /etc/limine-entry-tool.d/)
+#   limine-snapper-sync     trägt die snapper-Schnappschüsse ins Bootmenü ein
+# Fehlen sie im Repo, installiert Etude trotzdem – dann mit festen Einträgen und ohne Schnappschüsse im Bootmenü.
+limine-mkinitcpio-hook
+limine-snapper-sync

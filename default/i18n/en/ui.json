@@ -1,0 +1,32 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Cancel",
+  "common.save": "Save",
+  "common.apply": "Apply",
+  "common.close": "Close",
+  "common.delete": "Delete",
+  "common.remove": "Remove",
+  "common.add": "Add",
+  "common.edit": "Edit",
+  "common.rename": "Rename",
+  "common.open": "Open",
+  "common.back": "Back",
+  "common.next": "Next",
+  "common.yes": "Yes",
+  "common.no": "No",
+  "common.on": "On",
+  "common.off": "Off",
+  "common.search": "Search",
+  "common.searchEllipsis": "Search …",
+  "common.select": "Select …",
+  "common.noResults": "Nothing found",
+  "common.loading": "Loading …",
+  "common.settings": "Settings",
+  "common.calendarWeek": "Wk",
+  "common.durationHoursMinutes": "%1 h %2 min",
+  "common.durationMinutes": "%1 min",
+  "common.items": {
+    "one": "%1 item",
+    "other": "%1 items"
+  }
+}

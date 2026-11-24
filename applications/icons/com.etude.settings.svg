@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#586579"/></linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+  </defs>
+  <path id="gear" d="M212.2 102.3 L236.0 107.0 L236.0 149.0 L212.2 153.7 A88 88 0 0 1 205.7 169.3 L219.2 189.5 L189.5 219.2 L169.3 205.7 A88 88 0 0 1 153.7 212.2 L149.0 236.0 L107.0 236.0 L102.3 212.2 A88 88 0 0 1 86.7 205.7 L66.5 219.2 L36.8 189.5 L50.3 169.3 A88 88 0 0 1 43.8 153.7 L20.0 149.0 L20.0 107.0 L43.8 102.3 A88 88 0 0 1 50.3 86.7 L36.8 66.5 L66.5 36.8 L86.7 50.3 A88 88 0 0 1 102.3 43.8 L107.0 20.0 L149.0 20.0 L153.7 43.8 A88 88 0 0 1 169.3 50.3 L189.5 36.8 L219.2 66.5 L205.7 86.7 A88 88 0 0 1 212.2 102.3 Z" fill="url(#body)" stroke="url(#body)" stroke-width="12" stroke-linejoin="round"/>
+  <circle id="ring-shadow" cx="128" cy="134" r="62" fill="#334155" fill-opacity=".35"/>
+  <circle id="ring" cx="128" cy="128" r="62" fill="url(#ring)"/>
+  <circle id="center-shadow" cx="128" cy="133" r="34" fill="#1e3a8a" fill-opacity=".3"/>
+  <circle id="center" cx="128" cy="128" r="34" fill="url(#core)"/>
+</svg>

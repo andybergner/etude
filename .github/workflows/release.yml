@@ -1,0 +1,61 @@
+# Baut ein Paket, sobald ein Release-Tag gepusht wird (scripts/release.sh), und legt es
+# ins Pacman-Repo. Das Repo ist das GitHub-Release "repo":
+#   [etude]
+#   Server = https://github.com/andybergner/etude/releases/download/repo
+name: release
+
+on:
+  push:
+    tags: ['ui-v*', 'etude-v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pacman-repo          # nie zwei Builds gleichzeitig an der Paketliste
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Prepare
+        run: |
+          pacman -Syu --noconfirm --needed git github-cli
+          useradd -m builder
+
+      - uses: actions/checkout@v5
+
+      - name: Build package
+        id: build
+        run: |
+          case "$GITHUB_REF_NAME" in
+            ui-v*)    pkg=etude-ui ;;
+            etude-v*) pkg=etude ;;
+          esac
+          echo "pkg=$pkg" >> "$GITHUB_OUTPUT"
+          chown -R builder "$GITHUB_WORKSPACE"
+          cd "packaging/$pkg"
+          # Quelle = dieser Checkout (der getaggte Stand); Abhängigkeiten braucht der Bau nicht
+          sudo -u builder env ETUDE_SRC="$GITHUB_WORKSPACE" makepkg --nodeps --noconfirm
+          ls -la *.pkg.tar.zst
+
+      - name: Update pacman repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          gh release view repo >/dev/null 2>&1 || \
+            gh release create repo --title "Etude pacman repository" --latest=false \
+              --notes "pacman.conf: [etude] / Server = https://github.com/$GH_REPO/releases/download/repo"
+          mkdir -p /tmp/repo && cd /tmp/repo
+          gh release download repo -p 'etude.db.tar.gz' -p 'etude.files.tar.gz' || true
+          cp "$GITHUB_WORKSPACE/packaging/${{ steps.build.outputs.pkg }}"/*.pkg.tar.zst .
+          repo-add etude.db.tar.gz *.pkg.tar.zst
+          # Release-Dateien können keine Symlinks sein: echte Kopien für pacman
+          rm -f etude.db etude.files
+          cp etude.db.tar.gz etude.db
+          cp etude.files.tar.gz etude.files
+          gh release upload repo --clobber *.pkg.tar.zst etude.db etude.db.tar.gz etude.files etude.files.tar.gz

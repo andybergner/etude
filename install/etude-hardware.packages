@@ -1,0 +1,20 @@
+# Pakete, die install/hardware/ je nach Computer dazunimmt (wie omarchy-other.packages).
+# Die ISO legt sie mit ins Offline-Repo, damit auch ohne Netzwerk alles installierbar ist.
+# Neuer Hardware-Fix mit pkg_add → das Paket hier eintragen.
+
+# cpu-microcode.sh
+intel-ucode
+amd-ucode
+
+# intel-gpu.sh
+vulkan-intel
+intel-media-driver
+libvpl
+vpl-gpu-rt
+libva-intel-driver
+
+# amd-gpu.sh
+vulkan-radeon
+
+# intel-thermald.sh
+thermald

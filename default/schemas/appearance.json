@@ -1,0 +1,56 @@
+{
+  "dark": {
+    "type": "bool",
+    "default": true,
+    "summary": "Dark mode"
+  },
+  "accent": {
+    "type": "color",
+    "default": "",
+    "summary": "Accent color (empty = default palette)"
+  },
+  "transparency": {
+    "type": "bool",
+    "default": true,
+    "summary": "Transparency effects for taskbar, menus and apps"
+  },
+  "wallpaperMode": {
+    "type": "enum",
+    "choices": [
+      "color",
+      "image"
+    ],
+    "default": "color",
+    "summary": "Desktop background: solid color or image"
+  },
+  "wallpaperColor": {
+    "type": "color",
+    "default": "#28292d",
+    "summary": "Background color"
+  },
+  "wallpaper": {
+    "type": "string",
+    "default": "",
+    "summary": "Path to the background image (wallpaperMode = image)"
+  },
+  "lockWallpaperMode": {
+    "type": "enum",
+    "choices": [
+      "desktop",
+      "color",
+      "image"
+    ],
+    "default": "desktop",
+    "summary": "Lock and sign-in screen background: same as desktop, solid color or image"
+  },
+  "lockWallpaperColor": {
+    "type": "color",
+    "default": "#28292d",
+    "summary": "Lock screen background color (lockWallpaperMode = color)"
+  },
+  "lockWallpaper": {
+    "type": "string",
+    "default": "",
+    "summary": "Path to the lock screen image (lockWallpaperMode = image)"
+  }
+}

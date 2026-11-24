@@ -1,0 +1,3 @@
+# Zusätzlich zum archiso-Profil "releng" (build.sh hängt diese Liste an)
+networkmanager
+gum

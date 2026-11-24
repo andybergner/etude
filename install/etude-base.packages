@@ -1,0 +1,35 @@
+# Pakete, die der Installer per pacstrap installiert (ein Paket pro Zeile, # = Kommentar).
+# Microcode, Grafiktreiber und Hardware-Fixes kommen danach über install/hardware/ dazu.
+
+# System
+base
+linux
+linux-firmware
+btrfs-progs
+sudo
+zram-generator
+man-db
+nano
+neovim
+git
+xdg-user-dirs
+
+# Bootloader und Schnappschüsse
+limine
+efibootmgr
+snapper
+snap-pac
+
+# Netzwerk, Ton, Grafik-Grundlage
+networkmanager
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+sof-firmware
+alsa-ucm-conf
+mesa
+
+# Etude (aus dem [etude]-Repo) und Browser
+etude
+chromium

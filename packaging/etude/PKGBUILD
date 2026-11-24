@@ -1,0 +1,111 @@
+# Maintainer: Andy Bergner
+# Etude – das System: Shell (Taskleiste, Startmenü, Sperrbildschirm), Einstellungen, Explorer,
+# Task-Manager, Hyprland-Konfiguration und die Sitzung „Etude“.
+#
+# Release:      scripts/release.sh etude 0.1.0-alpha.1   (setzt pkgver, Tag etude-v0.1.0-alpha.1, GitHub baut)
+# Lokal testen: ETUDE_SRC=~/dev/etude makepkg -sif
+
+pkgname=etude
+pkgver=0.1.0alpha1
+pkgrel=1
+pkgdesc="Etude – a Windows-like desktop on Hyprland: shell, settings, file explorer and task manager"
+arch=('any')
+url="https://github.com/andybergner/etude"
+license=('MIT')
+depends=(
+    'etude-ui>=0.1.0alpha1'  # gemeinsame Texte (default/i18n/*/ui.json), AppWindow, FocusNav, Notify
+    'hyprland' 'quickshell' 'kitty' 'jq'
+    'libarchive'            # bsdtar: ZIP im Explorer
+    'polkit'
+    'networkmanager'
+    'pipewire' 'wireplumber'
+    'upower'
+    'udisks2'               # Laufwerke im Explorer
+    'xdg-utils'
+    'xdg-desktop-portal-hyprland'
+    'adwaita-cursors'       # Mauszeiger (env.lua)
+    'grim' 'slurp' 'wl-clipboard'   # Bildschirmfoto (Tastenkürzel)
+    'wl-clip-persist' 'cliphist'    # Zwischenablage behalten, Verlauf (Super+V)
+    'playerctl'             # Medientasten
+    'pacman-contrib' 'fakeroot'     # checkupdates: Etude Update sucht ohne Root
+    'greetd'                # Anmeldebildschirm
+    'accountsservice'       # Profilbilder auf dem Anmeldebildschirm
+    'file'                  # Bildprüfung in etude-greeter
+    # Funktionen der Einstellungen und der Shell – gehören fest dazu
+    'bluez' 'bluez-utils'   # Bluetooth
+    'power-profiles-daemon' # Energiemodus
+    'brightnessctl'         # Bildschirmhelligkeit
+    'hyprsunset'            # Nachtlicht
+    'ufw'                   # Firewall
+    'libnotify'             # notify-send (Test-Benachrichtigung, Skripte)
+    'wtype'                 # Zwischenablage-Verlauf fügt den Eintrag direkt ein
+)
+optdepends=(
+    'xdg-terminal-exec: Terminal für Terminal-Apps wie Neovim wählen (sonst kitty)'
+)
+makedepends=('git')
+install=etude.install
+
+if [ -n "${ETUDE_SRC:-}" ]; then
+    source=(); sha256sums=()
+    _src() { echo "$ETUDE_SRC"; }
+else
+    _tag="etude-v$pkgver"; [ "$pkgrel" = 1 ] || _tag="$_tag-$pkgrel"   # Tag von scripts/release.sh
+    source=("etude::git+$url.git#tag=$_tag")
+    sha256sums=('SKIP')
+    _src() { echo "$srcdir/etude"; }
+fi
+
+package() {
+    cd "$(_src)"
+    local home="$pkgdir/usr/share/etude"
+
+    # Programmdateien (ETUDE_HOME = /usr/share/etude) – gleicher Aufbau wie das Repo:
+    #   shell/ apps/ greeter/   Oberfläche (QML)
+    #   default/                Etude-Vorgaben: hypr, kitty, greeter, limine, snapper, i18n, schemas …
+    #   config/                 Vorlagen für ~/.config (hyprland.lua, kitty.conf), kopiert etude-setup
+    #   migrations/             laufen einmal pro Nutzer (etude-setup)
+    #   install/                Installations-Bausteine (wie auf der ISO), z. B. nach einem
+    #                           Hardwarewechsel: sudo bash /usr/share/etude/install/hardware/all.sh
+    install -d "$home"
+    cp -r --no-preserve=ownership shell apps greeter default config migrations install "$home/"
+    rm -f "$home"/default/i18n/*/ui.json             # gemeinsame Texte bringt etude-ui mit
+    find "$home" -type d -exec chmod 755 {} + -o -type f -exec chmod 644 {} +
+    find "$home" -name '*.sh' ! -path '*/install/helpers/*' -exec chmod 755 {} +
+    chmod 755 "$home"/default/shim/*                # xdg-open → etude-open (PATH in der Sitzung)
+    # Übergang für Testinstallationen mit dem alten Aufbau (vor 0.1.0), bis sich jeder Nutzer einmal
+    # neu angemeldet hat – etude-setup und Migration 001 stellen dann um. Kann mit 0.2.0 entfallen.
+    install -d "$home/hypr" "$home/share"
+    ln -s ../default/hypr "$home/hypr/etude"
+    ln -s ../default/wallpapers "$home/share/wallpapers"
+
+    # QML-Module Etude.Services (System-Dienste), Etude.Lock (Sperr-/Anmeldebildschirm) und
+    # Etude.Menus (Netzwerk-/Bluetooth-/Ton-/Akku-Menü: Leiste und Anmeldebildschirm) – nicht öffentlich
+    install -d "$pkgdir/usr/lib/qt6/qml/Etude"
+    cp -r --no-preserve=ownership qml/Etude/Services qml/Etude/Lock qml/Etude/Menus "$pkgdir/usr/lib/qt6/qml/Etude/"
+    find "$pkgdir/usr/lib/qt6/qml/Etude/Services" "$pkgdir/usr/lib/qt6/qml/Etude/Lock" "$pkgdir/usr/lib/qt6/qml/Etude/Menus" \
+        -type d -exec chmod 755 {} + -o -type f -exec chmod 644 {} +
+
+    # Programme
+    local b
+    for b in etude-settings etude-files etude-taskmanager etude-autostart etude-setup etude-session etude-greeter etude-open; do
+        install -Dm755 "bin/$b" "$pkgdir/usr/bin/$b"
+    done
+
+    # Startmenü, Icons
+    local tpl
+    install -d "$pkgdir/usr/share/applications"
+    for tpl in applications/*.desktop.in; do
+        sed 's|@BIN@|/usr/bin|g' "$tpl" > "$pkgdir/usr/share/applications/$(basename "${tpl%.in}")"
+        chmod 644 "$pkgdir/usr/share/applications/$(basename "${tpl%.in}")"
+    done
+    install -Dm644 applications/icons/*.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/apps/"
+
+    # Systemdateien aus default/: polkit, Sitzung, greetd, tmpfiles
+    install -Dm644 default/polkit/rules.d/*.rules -t "$pkgdir/usr/share/polkit-1/rules.d/"
+    install -Dm644 default/wayland-sessions/etude.desktop "$pkgdir/usr/share/wayland-sessions/etude.desktop"
+    install -Dm644 default/systemd/greetd.service.d/etude.conf "$pkgdir/usr/lib/systemd/system/greetd.service.d/etude.conf"
+    install -Dm644 default/tmpfiles.d/etude.conf "$pkgdir/usr/lib/tmpfiles.d/etude.conf"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

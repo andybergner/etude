@@ -1,0 +1,5 @@
+{
+  "calendar.dateFormat": "dddd, MMMM d",
+  "calendar.timeFormat": "h:mm AP",
+  "calendar.today": "Today"
+}

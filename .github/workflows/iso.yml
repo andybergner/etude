@@ -1,0 +1,73 @@
+# Baut die Etude-ISO, sobald ein Tag iso-v* gepusht wird, und hängt sie an ein eigenes Release.
+#   git tag -a iso-v0.1.0-alpha.1 -m "Etude ISO 0.1.0-alpha.1" && git push origin iso-v0.1.0-alpha.1
+# Vorabversionen (-alpha.N, -beta.N, -rc.N) erscheinen auf GitHub als „Pre-release“.
+# Die ISO enthält alle Pakete (Offline-Repo, Stand beim Bauen) und installiert ohne Internet.
+# GitHub erlaubt höchstens 2 GiB pro Datei – ist die ISO größer, wird sie in Teile zerlegt
+# (zusammensetzen: cat etude-*.iso.part-* > etude.iso, prüfen mit SHA256SUMS).
+name: iso
+
+on:
+  push:
+    tags: ['iso-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged          # mkarchiso braucht root und Mount-Rechte
+    steps:
+      - name: Prepare
+        run: pacman -Syu --noconfirm --needed archiso git github-cli
+
+      - uses: actions/checkout@v5
+
+      - name: Build ISO
+        run: |
+          # Tag iso-v0.1.0-alpha.1 → VERSION=0.1.0-alpha.1; manueller Lauf → Testbau mit Datum
+          case "$GITHUB_REF_NAME" in iso-v*) export VERSION="${GITHUB_REF_NAME#iso-v}" ;; esac
+          OUT="$GITHUB_WORKSPACE/out" WORK=/tmp/etude-iso bash iso/build.sh
+
+      - name: Checksum
+        run: |
+          cd out && sha256sum *.iso > SHA256SUMS && cat SHA256SUMS
+          ls -lh *.iso
+
+      - name: Split (über 2 GiB)
+        if: startsWith(github.ref, 'refs/tags/iso-v')
+        run: |
+          cd out
+          for f in *.iso; do
+            if [ "$(stat -c %s "$f")" -gt 2000000000 ]; then
+              split -b 1900M -d -a 2 "$f" "$f.part-" && rm "$f"
+              echo "zerlegt: $f"
+            fi
+          done
+          ls -lh
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/iso-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          notes="USB-Stick schreiben: sudo dd if=etude-*.iso of=/dev/sdX bs=4M status=progress oflag=sync – Anleitung: docs/iso.md"
+          if ls out/*.part-* >/dev/null 2>&1; then
+            notes="Die ISO ist größer als 2 GiB und deshalb in Teile zerlegt. Alle Teile laden, dann: cat etude-*.iso.part-* > etude.iso && sha256sum -c SHA256SUMS – $notes"
+          fi
+          pre=""
+          case "$GITHUB_REF_NAME" in *-alpha.*|*-beta.*|*-rc.*) pre=--prerelease ;; esac
+          gh release create "$GITHUB_REF_NAME" out/*.iso* out/SHA256SUMS $pre \
+            --title "Etude ISO ${GITHUB_REF_NAME#iso-v}" --notes "$notes"
+
+      - name: Upload (manueller Lauf)
+        if: ${{ !startsWith(github.ref, 'refs/tags/iso-v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: etude-iso
+          path: out/

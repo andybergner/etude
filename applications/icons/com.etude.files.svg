@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#fbbf24"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient>
+  </defs>
+  <path id="folder-back" d="M36 36h62q8 0 13 6l12 14h97q16 0 16 16v146q0 16-16 16H36q-16 0-16-16V52q0-16 16-16z" fill="url(#back)"/>
+  <path id="folder-front" d="M20 112q0-16 16-16h184q16 0 16 16v98q0 16-16 16H36q-16 0-16-16z" fill="url(#front)"/>
+  <path id="tray" d="M62 220V172q0-28 28-28h76q28 0 28 28v48q0 16-16 16H78q-16 0-16-16z" fill="url(#blue)"/>
+  <rect id="tray-slot" x="98" y="178" width="60" height="10" rx="5" fill="#1e3a8a" fill-opacity=".7"/>
+</svg>

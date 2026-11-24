@@ -1,0 +1,16 @@
+{
+  "polkit.notAllowed": "„%1“ darf das nicht bestätigen.",
+  "polkit.allowed": "Erlaubt: %1",
+  "polkit.wrongCredentials": "Benutzername oder Kennwort ist falsch.",
+  "polkit.title": "Benutzerkontensteuerung",
+  "polkit.question": "Möchtest du zulassen, dass diese App Änderungen an deinem Gerät vornimmt?",
+  "polkit.signInAdmin": "Melde dich mit einem Administratorkonto an, um fortzufahren.",
+  "polkit.systemAction": "Systemaktion",
+  "polkit.runAsAdmin": "Wird als Administrator ausgeführt",
+  "polkit.hideDetails": "Details ausblenden",
+  "polkit.showDetails": "Details anzeigen",
+  "polkit.command": "Befehl: %1",
+  "polkit.action": "Aktion: %1",
+  "polkit.userName": "Benutzername",
+  "polkit.password": "Kennwort"
+}

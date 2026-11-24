@@ -1,0 +1,15 @@
+{
+  "startmenu.signOut": "Abmelden",
+  "startmenu.restart": "Neu starten",
+  "startmenu.shutDown": "Herunterfahren",
+  "startmenu.terminal": "Terminal",
+  "startmenu.taskManager": "Task-Manager",
+  "startmenu.taskManagerShortcut": "Strg ⇧ Esc",
+  "startmenu.settings": "Einstellungen",
+  "startmenu.explorer": "Explorer",
+  "startmenu.shutDownOrSignOut": "Herunterfahren oder abmelden",
+  "startmenu.user": "Benutzer",
+  "startmenu.searchApps": "Apps suchen",
+  "startmenu.noResults": "Keine Ergebnisse für „%1“",
+  "startmenu.noApps": "Keine Apps gefunden"
+}

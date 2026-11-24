@@ -1,0 +1,48 @@
+# Maintainer: Andy Bergner
+# Etude UI – die SDK: Theme, Komponenten, i18n und Einstellungen (Etude.Ui) für Etude und eigenständige Apps.
+#
+# Release:      scripts/release.sh ui 0.1.0-alpha.1      (setzt pkgver, Tag ui-v0.1.0-alpha.1, GitHub baut)
+# Lokal testen: ETUDE_SRC=~/dev/etude makepkg -sif (nimmt den aktuellen Stand deines Checkouts)
+
+pkgname=etude-ui
+pkgver=0.1.0alpha1
+pkgrel=1
+pkgdesc="Etude UI – theme, components, i18n and settings for Etude apps (QML module Etude.Ui)"
+arch=('any')
+url="https://github.com/andybergner/etude"
+license=('MIT')
+depends=('quickshell' 'jq' 'inter-font' 'ttf-jetbrains-mono-nerd' 'libnotify')
+makedepends=('git')
+
+if [ -n "${ETUDE_SRC:-}" ]; then
+    source=(); sha256sums=()
+    _src() { echo "$ETUDE_SRC"; }
+else
+    _tag="ui-v$pkgver"; [ "$pkgrel" = 1 ] || _tag="$_tag-$pkgrel"   # Tag von scripts/release.sh
+    source=("etude::git+$url.git#tag=$_tag")
+    sha256sums=('SKIP')
+    _src() { echo "$srcdir/etude"; }
+fi
+
+package() {
+    cd "$(_src)"
+
+    # QML-Modul an den Standardort – jede App findet es mit `import Etude.Ui`
+    install -d "$pkgdir/usr/lib/qt6/qml/Etude"
+    cp -r --no-preserve=ownership qml/Etude/Ui "$pkgdir/usr/lib/qt6/qml/Etude/"
+    find "$pkgdir/usr/lib/qt6/qml/Etude/Ui" -type d -exec chmod 755 {} + -o -type f -exec chmod 644 {} +
+
+    install -Dm755 bin/etude-i18n   "$pkgdir/usr/bin/etude-i18n"
+    install -Dm755 bin/etude-config "$pkgdir/usr/bin/etude-config"
+
+    # Gemeinsame Texte (OK, Abbrechen …) – Etude-Kataloge liegen in /usr/share/etude/default/i18n
+    local f
+    for f in default/i18n/*/ui.json; do
+        install -Dm644 "$f" "$pkgdir/usr/share/etude/$f"
+    done
+
+    # Hier legen Apps ihre Einstellungs-Schemas ab (<domain>.json)
+    install -d "$pkgdir/usr/share/etude/schemas"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

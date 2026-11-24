@@ -1,0 +1,44 @@
+{
+  "enabled": {
+    "type": "bool",
+    "default": true,
+    "summary": "Notifications from apps and the system"
+  },
+  "dnd": {
+    "type": "bool",
+    "default": false,
+    "summary": "Do not disturb (only urgent notifications show banners)"
+  },
+  "banners": {
+    "type": "bool",
+    "default": true,
+    "summary": "Show banners"
+  },
+  "position": {
+    "type": "enum",
+    "choices": [
+      "auto",
+      "bottom-right",
+      "bottom-left",
+      "top-right",
+      "top-left"
+    ],
+    "default": "auto",
+    "summary": "Where banners appear (auto = corner next to the taskbar, right)"
+  },
+  "sound": {
+    "type": "bool",
+    "default": true,
+    "summary": "Play a sound"
+  },
+  "muted": {
+    "type": "list",
+    "default": [],
+    "summary": "Apps without notifications (app names)"
+  },
+  "apps": {
+    "type": "list",
+    "default": [],
+    "summary": "Apps that have sent notifications ({ name, icon })"
+  }
+}

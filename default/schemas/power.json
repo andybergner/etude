@@ -1,0 +1,43 @@
+{
+  "idleAcLock": {
+    "type": "int",
+    "min": 0,
+    "default": 5,
+    "summary": "Plugged in: minutes until the screen locks (0 = never)"
+  },
+  "idleAcScreen": {
+    "type": "int",
+    "min": 0,
+    "default": 10,
+    "summary": "Plugged in: minutes until the screen turns off (0 = never)"
+  },
+  "idleAcSuspend": {
+    "type": "int",
+    "min": 0,
+    "default": 0,
+    "summary": "Plugged in: minutes until sleep (0 = never)"
+  },
+  "idleBatLock": {
+    "type": "int",
+    "min": 0,
+    "default": 3,
+    "summary": "On battery: minutes until the screen locks (0 = never)"
+  },
+  "idleBatScreen": {
+    "type": "int",
+    "min": 0,
+    "default": 5,
+    "summary": "On battery: minutes until the screen turns off (0 = never)"
+  },
+  "idleBatSuspend": {
+    "type": "int",
+    "min": 0,
+    "default": 15,
+    "summary": "On battery: minutes until sleep (0 = never)"
+  },
+  "lockOnSuspend": {
+    "type": "bool",
+    "default": true,
+    "summary": "Lock the screen before sleep"
+  }
+}

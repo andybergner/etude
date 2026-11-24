@@ -1,0 +1,60 @@
+#!/bin/sh
+# Übersetzten Text für Shell-Skripte ausgeben.
+#   etude-i18n -D <bereich> [--count <n>] <schlüssel> [werte…]   Etude: default/i18n/<sprache>/<bereich>.json
+#   etude-i18n -d <ordner>  [--count <n>] <schlüssel> [werte…]   eigene App: <ordner>/<sprache>.json
+#   z. B. etude-i18n -D files files.conflictSelf "Bilder"
+# Ohne -D/-d: gemeinsame Texte (Bereich ui).
+# Sprache = Systemsprache (wie in der Shell); fehlt ein Text, gilt die Grundsprache, dann
+# en.json, dann der Schlüssel. %1, %2 … werden durch die Werte ersetzt.
+# Braucht jq; ohne jq wird der Schlüssel mit den Werten ausgegeben.
+set -u
+dir=""; domain=""; count=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -d) dir=$2; shift 2 ;;
+        -D) domain=$2; shift 2 ;;
+        --count) count=$2; shift 2 ;;
+        *) break ;;
+    esac
+done
+key=${1:-}; [ -n "$key" ] || { echo "Aufruf: etude-i18n -D <bereich> | -d <ordner> [--count n] <schlüssel> [werte…]" >&2; exit 1; }
+shift
+# Etude-Kataloge: default/i18n im Repo (Entwicklung) bzw. /usr/share/etude/default/i18n
+[ -z "$dir" ] && [ -z "$domain" ] && domain=ui
+root=""
+if [ -n "$domain" ]; then
+    for d in "${ETUDE_HOME:-}/default/i18n" "$(dirname "$(readlink -f "$0")")/../default/i18n" /usr/share/etude/default/i18n; do
+        [ -d "$d" ] && { root=$d; break; }
+    done
+fi
+
+# Sprache = Systemsprache, wie in der Shell: ~/.config/locale.conf, /etc/locale.conf, Umgebung
+lang=${LC_ALL:-}
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/locale.conf" /etc/locale.conf; do
+    [ -n "$lang" ] && break
+    [ -f "$f" ] && lang=$(sed -n 's/^[[:space:]]*\(LC_ALL\|LC_MESSAGES\|LANG\)[[:space:]]*=[[:space:]]*"\{0,1\}\([^"[:space:]]*\).*/\1 \2/p' "$f" |
+        awk '{ v[$1] = $2 } END { print (v["LC_ALL"] ? v["LC_ALL"] : (v["LC_MESSAGES"] ? v["LC_MESSAGES"] : v["LANG"])) }')
+done
+[ -n "$lang" ] || lang=${LC_MESSAGES:-${LANG:-en}}
+lang=$(printf '%s' "$lang" | sed 's/[.@].*//; s/_/-/')
+case "$lang" in C|POSIX|"") lang=en ;; esac
+base=${lang%%-*}
+
+text=""
+if command -v jq >/dev/null 2>&1; then
+    # Mehrzahl: "one" bei 1, sonst "other" (reicht für en/de; weitere Regeln in Plural.js)
+    form=other; [ -n "$count" ] && [ "$count" = 1 ] && form=one
+    for code in "$lang" "$base" en; do
+        if [ -n "$domain" ]; then f="$root/$code/$domain.json"; else f="$dir/$code.json"; fi
+        [ -f "$f" ] || continue
+        text=$(jq -r --arg k "$key" --arg f "$form" '.[$k] | if type == "object" then (.[$f] // .other) elif type == "string" then . else empty end' "$f" 2>/dev/null)
+        [ -n "$text" ] && break
+    done
+fi
+[ -n "$text" ] || text=$key
+i=1
+for v in "$@"; do
+    text=$(printf '%s' "$text" | awk -v n="%$i" -v v="$v" 'BEGIN { gsub(/\\/, "\\\\", v); gsub(/&/, "\\\\&", v) } { gsub(n, v); print }')
+    i=$((i + 1))
+done
+printf '%s\n' "$text"

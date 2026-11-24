@@ -1,0 +1,107 @@
+#!/bin/sh
+# Etude-Anmeldebildschirm (greetd)
+#
+#   etude-greeter                 Startet den Anmeldebildschirm. Ruft greetd als Nutzer „greeter“ auf.
+#   pkexec etude-greeter appearance <bild|-> <json>
+#                                 Aussehen für den Anmeldebildschirm (macht die Shell automatisch):
+#                                 Bild nach /etc/etude/greeter/wallpaper, JSON nach …/appearance.json.
+#                                 Das Bild wird als der aufrufende Nutzer gelesen (PKEXEC_UID).
+#   etude-greeter status          Zeigt, ob greetd aktiv ist.
+#
+# Eingerichtet wird greetd vom Paket (systemd-Drop-in + default/greeter/greetd.toml), nicht von Hand.
+# Notausgang: Strg+Alt+F2, anmelden, sudo systemctl disable greetd
+set -eu
+
+SELF_DIR=$(dirname "$(readlink -f "$0")")
+if [ -z "${ETUDE_HOME:-}" ]; then
+    if [ -f "$SELF_DIR/../shell/shell.qml" ]; then ETUDE_HOME=$(cd "$SELF_DIR/.." && pwd); else ETUDE_HOME=/usr/share/etude; fi
+fi
+export ETUDE_HOME
+
+ETC_DIR=/etc/etude/greeter
+
+die() { echo "etude-greeter: $*" >&2; exit 1; }
+need_root() { [ "$(id -u)" = 0 ] || die "please run as root (sudo etude-greeter $1)"; }
+
+case "${1:-}" in
+"")
+    # Tastaturbelegung des Systems: localectl (X11), sonst Konsole (/etc/vconsole.conf), sonst us.
+    # Nur Belegungen, die es in xkb wirklich gibt – localectl meldet z. B. "(unset)", und eine
+    # ungültige Belegung bringt Hyprland zum Absturz.
+    valid_kb() { [ -n "$1" ] && [ -f "/usr/share/X11/xkb/symbols/$1" ]; }
+    kb="" kv=""
+    if command -v localectl >/dev/null 2>&1; then
+        kb=$(localectl status 2>/dev/null | sed -n 's/^ *X11 Layout: *//p' | cut -d, -f1 | tr -d '[:space:]')
+        kv=$(localectl status 2>/dev/null | sed -n 's/^ *X11 Variant: *//p' | cut -d, -f1 | tr -d '[:space:]')
+    fi
+    if ! valid_kb "$kb"; then
+        kb=$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf 2>/dev/null | tr -d '"[:space:]' | sed 's/-.*//')
+        kv=""
+    fi
+    valid_kb "$kb" || { kb=us; kv=""; }
+    case "$kv" in *[!a-z0-9_-]*) kv="" ;; esac       # "(unset)", "n/a" …
+    export ETUDE_GREETER_KB_LAYOUT="$kb" ETUDE_GREETER_KB_VARIANT="$kv"
+    export XKB_DEFAULT_LAYOUT="$ETUDE_GREETER_KB_LAYOUT" XKB_DEFAULT_VARIANT="$kv"
+    log=/var/lib/etude-greeter/greeter.log
+    echo "$(date '+%F %T') layout=$ETUDE_GREETER_KB_LAYOUT variant=$kv" >> "$log" 2>/dev/null || true
+    [ -d "$ETUDE_HOME/qml" ] && export QML_IMPORT_PATH="$ETUDE_HOME/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+    # Frischer Arbeitsordner bei jedem Start (Cache, Zustand, Daten). start-hyprland merkt sich dort,
+    # wenn Hyprland nicht sauber endete – und greetd beendet den Greeter beim Login. Ohne alte Spur
+    # gibt es keinen Safe Mode. mktemp: Den Ordner kann kein anderer Nutzer vorher anlegen.
+    find /tmp -maxdepth 1 -name 'etude-greeter.*' -user "$(id -u)" -exec rm -rf {} + 2>/dev/null || true
+    work=$(mktemp -d /tmp/etude-greeter.XXXXXX)
+    mkdir -p "$work/cache" "$work/state" "$work/data"
+    export XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" XDG_DATA_HOME="$work/data"
+    echo "$(date '+%F %T') work=$work" >> "$log" 2>/dev/null || true
+
+    cfg="$ETUDE_HOME/default/greeter/hyprland.lua"
+    # start-hyprland ist nötig: Hyprland 0.57 bricht ohne es beim Anzeigen seiner Warnung ab
+    # Ausgabe ins Log statt auf die Konsole (sonst sieht man beim Start Hyprlands Logo und Meldungen)
+    out="$work/hyprland.log"
+    if command -v start-hyprland >/dev/null 2>&1; then exec start-hyprland -- --config "$cfg" >"$out" 2>&1; fi
+    exec Hyprland --config "$cfg" >"$out" 2>&1
+    ;;
+appearance)
+    need_root appearance
+    [ $# -eq 3 ] || die "usage: etude-greeter appearance <image|-> <json>"
+    img=$2 json=$3
+    command -v jq >/dev/null 2>&1 || die "jq is missing"
+    install -d -m 755 "$ETC_DIR"
+    if [ "$img" != "-" ]; then
+        # Als der Nutzer lesen, der pkexec aufgerufen hat – root darf sonst jede Datei kopieren
+        tmp=$(mktemp "$ETC_DIR/.wallpaper.XXXXXX")
+        if [ -n "${PKEXEC_UID:-}" ]; then
+            runuser -u "$(id -nu "$PKEXEC_UID")" -- head -c 52428800 -- "$img" > "$tmp" || { rm -f "$tmp"; die "cannot read image: $img"; }
+        else
+            head -c 52428800 -- "$img" > "$tmp" || { rm -f "$tmp"; die "cannot read image: $img"; }
+        fi
+        case "$(file -b --mime-type "$tmp")" in
+            image/*) ;;
+            *) rm -f "$tmp"; die "not an image: $img" ;;
+        esac
+        chmod 644 "$tmp"
+        mv -f "$tmp" "$ETC_DIR/wallpaper"
+        json=$(printf '%s' "$json" | jq -c --arg w "$ETC_DIR/wallpaper" --arg s "$img" '. + { wallpaper: $w, source: $s }') || die "invalid JSON"
+    else
+        rm -f "$ETC_DIR/wallpaper"
+        json=$(printf '%s' "$json" | jq -c 'del(.wallpaper, .source) | .wallpaperMode = "color"') || die "invalid JSON"
+    fi
+    # nur bekannte Schlüssel übernehmen
+    printf '%s' "$json" | jq '{ dark, accent, wallpaperMode, wallpaperColor, wallpaper, source } | with_entries(select(.value != null))' \
+        > "$ETC_DIR/appearance.json.tmp"
+    chmod 644 "$ETC_DIR/appearance.json.tmp"
+    mv -f "$ETC_DIR/appearance.json.tmp" "$ETC_DIR/appearance.json"
+    echo "Sign-in screen appearance updated."
+    ;;
+status)
+    if systemctl is-enabled greetd.service >/dev/null 2>&1; then
+        echo "enabled"
+    else
+        echo "disabled"; exit 1
+    fi
+    ;;
+*)
+    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
+esac

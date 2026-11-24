@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1f5f9"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#475569"/><stop offset="1" stop-color="#334155"/></linearGradient>
+    <clipPath id="clip"><rect x="20" y="36" width="216" height="184" rx="22"/></clipPath>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c55e" stop-opacity=".5"/><stop offset="1" stop-color="#22c55e" stop-opacity=".1"/></linearGradient>
+  </defs>
+  <rect id="window" x="20" y="36" width="216" height="184" rx="22" fill="url(#body)"/>
+  <path id="titlebar" d="M20 58q0-22 22-22h172q22 0 22 22v22H20z" fill="url(#bar)"/>
+  <g id="dots" fill="#cbd5e1"><circle cx="48" cy="58" r="7"/><circle cx="72" cy="58" r="7"/><circle cx="96" cy="58" r="7"/></g>
+  <g clip-path="url(#clip)">
+  <path id="area" d="M20 190l40-34 38 16 42-58 40 28 56-40v118H20z" fill="url(#area)"/>
+  <path id="line" d="M10 190l50-34 38 16 42-58 40 28 56-40 16-10" fill="none" stroke="#16a34a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

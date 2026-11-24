@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="271" height="271" viewBox="120.5 120.5 271 271">
+  <!-- Etude-Zeichen ohne Kachel (transparent), z. B. für Bootscreen, Login, Doku -->
+  <defs>
+    <clipPath id="upper"><polygon points="0,0 494,0 0,494"/></clipPath>
+    <clipPath id="lower"><polygon points="512,18 512,512 18,512"/></clipPath>
+  </defs>
+  <path clip-path="url(#upper)" fill="#c0caf5" fill-rule="evenodd"
+        d="M120.5 120.5 H391.5 V391.5 H120.5 Z M186.7 186.7 V325.3 H325.3 V186.7 Z"/>
+  <path clip-path="url(#lower)" fill="#7aa2f7" fill-rule="evenodd"
+        d="M120.5 120.5 H391.5 V391.5 H120.5 Z M186.7 186.7 V325.3 H325.3 V186.7 Z"/>
+</svg>
