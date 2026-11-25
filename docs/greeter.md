@@ -41,6 +41,7 @@ Der Anmeldebildschirm läuft als Nutzer `greeter` und kann `~/.config/etude` nic
 | Sprache | `/etc/locale.conf` |
 | Tastatur | `localectl` (X11-Layout) bzw. `/etc/vconsole.conf` |
 | Hell/Dunkel, Akzent, Hintergrund | `/etc/etude/greeter/appearance.json` und `/etc/etude/greeter/wallpaper` |
+| Bildschirme (Auflösung, Skalierung, Anordnung) | `/etc/etude/greeter/monitors.lua` (+ `monitors.json`), fehlt sie: automatisch |
 | Profilbilder | `/var/lib/AccountsService/icons/<nutzer>` (Einstellungen › Konten setzt das mit) |
 | zuletzt angemeldet | `/var/lib/etude-greeter/last-user` |
 | Log (Tastatur, Arbeitsordner) | `/var/lib/etude-greeter/greeter.log` |
@@ -49,7 +50,10 @@ Der Anmeldebildschirm läuft als Nutzer `greeter` und kann `~/.config/etude` nic
 
 Das hält die Shell automatisch aktuell (`shell/modules/lock/GreeterSync.qml`): Ändert sich Hintergrund,
 Hell/Dunkel oder Akzentfarbe, ruft sie nach 2 s `pkexec etude-greeter appearance <bild|-> <json>` auf.
-Die polkit-Regel (`default/polkit/rules.d/50-etude.rules`) erlaubt genau diesen Befehl für aktive lokale
+Ändern sich die Bildschirme (Einstellungen › Bildschirm schreibt `~/.config/hypr/etude-settings.lua` mit
+der Zeile `-- etude-monitors: {…}`), ruft sie `pkexec etude-greeter display <json>` auf; `etude-greeter`
+prüft jeden Wert (Ausgangsname, Auflösung, Skalierung 0,25–4 …) und erzeugt daraus erst dann Lua.
+Die polkit-Regel (`default/polkit/rules.d/50-etude.rules`) erlaubt genau diese Befehle für aktive lokale
 Nutzer in `wheel` ohne Passwort. `etude-greeter` liest das Bild dabei als der aufrufende Nutzer
 (`PKEXEC_UID`) und nimmt nur echte Bilder – fremde Dateien lassen sich so nicht nach `/etc` kopieren.
 Nutzer außerhalb von `wheel` und der Entwicklungsmodus synchronisieren nicht (sonst käme eine Passwortabfrage).

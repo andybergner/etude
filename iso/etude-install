@@ -390,10 +390,16 @@ step "Dateisysteme einhängen"         bash -c "
 
 # ---------- Pakete ----------
 if [ -n "$OFFLINE" ]; then
-    # Offline-Repo der ISO: pacstrap -c nimmt die Pakete direkt von dort (CacheDir in der Config)
-    PACSTRAP=(pacstrap -K -c -C "$OFFLINE_CONF")
+    # Offline-Repo der ISO: pacstrap -c nimmt die Pakete direkt von dort (CacheDir in der Config).
+    # Kein -K: ein leerer Schlüsselbund müsste die Arch-Schlüssel aus dem Internet laden. Stattdessen
+    # übernimmt pacstrap den Schlüsselbund des Live-Systems (pacman-init hat ihn beim Start befüllt).
+    PACSTRAP=(pacstrap -c -C "$OFFLINE_CONF")
     TARGET_PACMAN=(pacman --config "$OFFLINE_CONF")
-    skip_step
+    step "Schlüsselbund vorbereiten"  bash -c "
+        systemctl start pacman-init.service 2>/dev/null
+        [ -d /etc/pacman.d/gnupg ] || pacman-key --init
+        pacman-key --populate archlinux"
+    skip_step                                      # „Paketquellen aktualisieren“ gibt es nur online
 else
     # [etude]-Repo muss im Live-System eingetragen sein
     grep -q '^\[etude\]' /etc/pacman.conf || cat >> /etc/pacman.conf <<'REPO'
@@ -404,6 +410,7 @@ Server = https://github.com/andybergner/etude/releases/download/repo
 REPO
     PACSTRAP=(pacstrap -K)
     TARGET_PACMAN=(pacman)
+    skip_step                                      # „Schlüsselbund vorbereiten“ gibt es nur offline
     step "Paketquellen aktualisieren" pacman -Sy --noconfirm
 fi
 step "System installieren (dauert)"   "${PACSTRAP[@]}" "$MNT" "${BASE_PKGS[@]}"

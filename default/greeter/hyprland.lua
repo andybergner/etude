@@ -19,6 +19,15 @@ hl.env("XCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland")
 
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
+-- Bildschirme wie in den Einstellungen (Auflösung, Skalierung, Anordnung) – schreibt die Shell
+-- über „etude-greeter display“; fehlt die Datei, bleibt alles automatisch
+local monitors = "/etc/etude/greeter/monitors.lua"
+local f = io.open(monitors, "r")
+if f then
+    f:close()
+    local ok, err = pcall(dofile, monitors)
+    if not ok then print("etude: " .. monitors .. ": " .. tostring(err)) end
+end
 
 hl.config({
     input = {

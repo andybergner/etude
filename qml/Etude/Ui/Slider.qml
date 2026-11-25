@@ -8,6 +8,10 @@ Item {
     property real value: 0.5          // 0..1
     property real step: 0.01
     property bool enabled_: true
+    // Mausrad: "auto" (Standard) – frei stehend ändert das Rad den Wert, in einer scrollbaren Seite
+    // nur, nachdem der Regler angeklickt wurde (bis die Maus ihn verlässt) oder per Tastatur den
+    // Fokus hat; sonst scrollt die Seite weiter. "always" / "never" erzwingen das eine oder andere.
+    property string wheel: "auto"
 
     signal moved(real value)          // beim Ziehen/Klicken (nicht bei Änderung von außen)
 
@@ -27,6 +31,21 @@ Item {
         else FocusNav.key(root, e)                       // Hoch/Runter: zum Nachbarn
     }
     readonly property bool keyboardFocus: activeFocus   // Klicks geben keinen Fokus – Fokus heißt hier Tastatur
+
+    // Liegt der Regler in einer Seite, die gerade scrollen kann?
+    function inScrollable() {
+        for (let p = parent; p; p = p.parent) {
+            if (p.flickableDirection !== undefined && p.contentHeight !== undefined
+                    && (p.contentHeight > p.height + 1 || p.contentWidth > p.width + 1)) return true
+        }
+        return false
+    }
+    property bool engaged: false      // angeklickt, solange die Maus darüber bleibt
+    function wheelWanted() {
+        if (wheel === "never") return false
+        if (wheel === "always") return true
+        return engaged || activeFocus || !inScrollable()
+    }
 
     readonly property real knob: 16
     readonly property real pos: Math.max(0, Math.min(1, value)) * (width - knob)
@@ -69,8 +88,13 @@ Item {
             v = Math.round(v / root.step) * root.step
             root.moved(v)
         }
-        onPressed: (e) => update(e.x)
+        onPressed: (e) => { root.engaged = true; update(e.x) }
         onPositionChanged: (e) => { if (pressed) update(e.x) }
-        onWheel: (e) => root.moved(Math.max(0, Math.min(1, root.value + (e.angleDelta.y > 0 ? 0.05 : -0.05))))
+        onContainsMouseChanged: if (!containsMouse && !pressed) root.engaged = false
+        onReleased: if (!containsMouse) root.engaged = false
+        onWheel: (e) => {
+            if (!root.wheelWanted()) { e.accepted = false; return }   // an die Seite weiterreichen
+            root.moved(Math.max(0, Math.min(1, root.value + (e.angleDelta.y > 0 ? 0.05 : -0.05))))
+        }
     }
 }

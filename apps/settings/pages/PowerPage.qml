@@ -87,18 +87,29 @@ Column {
         icon: g(0xF06A5)
         label: tr.t("power.powerMode")
         desc: root.power.available ? tr.t("power.balancePerformanceAndEnergyUse")
-                                   : tr.t("power.notAvailableInstallSudoPacman")
+            : root.power.installed ? tr.t("power.serviceStopped")
+            : tr.t("power.notAvailableInstallSudoPacman")
         Select {
             visible: root.power.available
             anchors.verticalCenter: parent.verticalCenter
             width: 200
+            // nur, was diese Hardware kann (manche Geräte haben kein „Leistung“)
             model: [
                 { value: "power-saver", label: tr.t("power.bestPowerEfficiency") },
                 { value: "balanced",    label: tr.t("power.balanced") },
                 { value: "performance", label: tr.t("power.bestPerformance") }
-            ]
+            ].filter(o => root.power.profiles.indexOf(o.value) >= 0)
             value: root.power.profile
             onActivated: (v) => root.power.set(v)
+        }
+        // Dienst installiert, läuft aber nicht → einschalten (Admin-Abfrage)
+        Button {
+            visible: root.power.status === "stopped"
+            anchors.verticalCenter: parent.verticalCenter
+            size: "sm"
+            enabled: !root.power.busy
+            text: tr.t("power.enableService")
+            onClicked: root.power.enable()
         }
     }
 

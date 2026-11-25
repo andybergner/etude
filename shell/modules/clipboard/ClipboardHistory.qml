@@ -61,10 +61,18 @@ Scope {
         const e = entries[i]
         if (!e) return
         close()
-        // kopieren, dann ins vorige Fenster einfügen (Strg+V über wtype, wenn vorhanden)
+        // kopieren, dann ins vorige Fenster einfügen (über wtype, wenn vorhanden):
+        // Terminals mit Strg+Umschalt+V (Strg+V ist dort kein Einfügen), alle anderen mit Strg+V
         Quickshell.execDetached(["sh", "-c",
             "printf '%s' \"$1\" | cliphist decode | wl-copy && sleep 0.15 && " +
-            "{ command -v wtype >/dev/null 2>&1 && wtype -M ctrl v -m ctrl; true; }", "sh", e.line])
+            "command -v wtype >/dev/null 2>&1 || exit 0; " +
+            "cls=$(hyprctl activewindow -j 2>/dev/null | sed -n 's/.*\"class\": *\"\\([^\"]*\\)\".*/\\1/p' | head -n1); " +
+            "case \"$cls\" in " +
+            "kitty|Alacritty|foot|footclient|com.mitchellh.ghostty|org.wezfurlong.wezterm|xterm|XTerm|" +
+            "org.kde.konsole|konsole|org.gnome.Console|org.gnome.Terminal|gnome-terminal-server|" +
+            "com.system76.CosmicTerm|Termite|st|st-256color|URxvt) " +
+            "wtype -M ctrl -M shift v -m shift -m ctrl ;; " +
+            "*) wtype -M ctrl v -m ctrl ;; esac", "sh", e.line])
     }
     function remove(i) {
         const e = entries[i]

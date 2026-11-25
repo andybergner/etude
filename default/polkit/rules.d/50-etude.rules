@@ -6,7 +6,7 @@
 //    (das alte Kennwort prüft die Einstellungen-App vorher selbst per PAM)
 //  - Speicher: alte Pakete aus dem Cache und alte Protokolle löschen (nur diese zwei Befehle)
 //  - Firewall: Status von ufw lesen (nur lesen – Ändern fragt die Benutzerkontensteuerung)
-//  - Anmeldebildschirm: das eigene Aussehen übernehmen (etude-greeter appearance, macht die Shell automatisch)
+//  - Anmeldebildschirm: das eigene Aussehen und die Bildschirme übernehmen (etude-greeter appearance/display, macht die Shell automatisch)
 //  - Anmeldebildschirm (Benutzer „greeter“): Netzwerk-Menü – WLAN verbinden/trennen, WLAN ein/aus.
 //    Neue WLANs werden dabei systemweit gespeichert, damit sie auch vor der Anmeldung verbinden.
 // Installation (Entwicklung): sudo install -Dm644 default/polkit/rules.d/50-etude.rules /etc/polkit-1/rules.d/
@@ -60,6 +60,11 @@ polkit.addRule(function (action, subject) {
         // Anmeldebildschirm übernimmt das Aussehen (etude-greeter liest das Bild als der aufrufende Nutzer)
         if (action.lookup("program") == "/usr/bin/etude-greeter" && subject.local && subject.active &&
             cmd.indexOf("/usr/bin/etude-greeter appearance ") == 0) {
+            return polkit.Result.YES;
+        }
+        // … und die Bildschirme (Auflösung, Skalierung) – etude-greeter prüft jeden Wert
+        if (action.lookup("program") == "/usr/bin/etude-greeter" && subject.local && subject.active &&
+            cmd.indexOf("/usr/bin/etude-greeter display ") == 0) {
             return polkit.Result.YES;
         }
     }

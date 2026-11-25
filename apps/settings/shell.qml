@@ -66,7 +66,7 @@ ShellRoot {
             id: content
             anchors.fill: parent
             focus: true
-            path: Quickshell.env("ETUDE_SETTINGS_PAGE") || "system"
+            initialPage: Quickshell.env("ETUDE_SETTINGS_PAGE") || "system"
             userName: accountSvc.displayName
             avatar: accountSvc.hasFace ? "file://" + accountSvc.facePath + "#" + accountSvc.faceVersion : ""
             hyprLayout: hyprSvc.layout

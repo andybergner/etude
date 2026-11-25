@@ -6,6 +6,11 @@
 #                                 Aussehen für den Anmeldebildschirm (macht die Shell automatisch):
 #                                 Bild nach /etc/etude/greeter/wallpaper, JSON nach …/appearance.json.
 #                                 Das Bild wird als der aufrufende Nutzer gelesen (PKEXEC_UID).
+#   pkexec etude-greeter display <json>
+#                                 Bildschirme für den Anmeldebildschirm (macht die Shell automatisch):
+#                                 {"<ausgang>": {mode, x, y, scale, transform, disabled}} wie in den
+#                                 Einstellungen › Bildschirm. Geprüft, dann als …/monitors.lua.
+#                                 "{}" entfernt die Datei (wieder automatisch).
 #   etude-greeter status          Zeigt, ob greetd aktiv ist.
 #
 # Eingerichtet wird greetd vom Paket (systemd-Drop-in + default/greeter/greetd.toml), nicht von Hand.
@@ -92,6 +97,50 @@ appearance)
     chmod 644 "$ETC_DIR/appearance.json.tmp"
     mv -f "$ETC_DIR/appearance.json.tmp" "$ETC_DIR/appearance.json"
     echo "Sign-in screen appearance updated."
+    ;;
+display)
+    need_root display
+    [ $# -eq 2 ] || die "usage: etude-greeter display <json>"
+    command -v jq >/dev/null 2>&1 || die "jq is missing"
+    install -d -m 755 "$ETC_DIR"
+    # Nur geprüfte Werte – aus der Datei wird Lua-Code für Hyprland, also nichts Freies übernehmen
+    norm=$(printf '%s' "$2" | jq -ce '
+        if type != "object" or (keys | length) > 16 then error("bad") else . end
+        | to_entries
+        | map(
+            if (.key | test("^[A-Za-z0-9_.:-]{1,64}$") | not) or (.value | type) != "object" then error("bad") else . end
+            | .value |= {
+                mode:      ((.mode // "") | tostring),
+                x:         ((.x // 0) | tonumber | floor),
+                y:         ((.y // 0) | tonumber | floor),
+                scale:     ((.scale // 1) | tonumber),
+                transform: ((.transform // 0) | tonumber | floor),
+                disabled:  (.disabled == true) }
+            | if .value.disabled then . else
+                if (.value.mode | test("^[0-9]{2,5}x[0-9]{2,5}(@[0-9]{1,3}(\\.[0-9]{1,3})?)?$") | not)
+                   or .value.scale < 0.25 or .value.scale > 4
+                   or .value.transform < 0 or .value.transform > 7
+                   or (.value.x | fabs) > 65536 or (.value.y | fabs) > 65536
+                then error("bad") else . end
+              end)
+        | from_entries') || die "invalid display JSON"
+    if [ "$norm" = "{}" ]; then
+        rm -f "$ETC_DIR/monitors.json" "$ETC_DIR/monitors.lua"
+        echo "Sign-in screen displays: automatic."
+        exit 0
+    fi
+    {
+        echo "-- Von etude-greeter erzeugt (Einstellungen › Bildschirm des zuletzt angemeldeten Admins)."
+        printf '%s' "$norm" | jq -r 'to_entries[] |
+            if .value.disabled then "hl.monitor({ output = \"\(.key)\", disabled = true })"
+            else "hl.monitor({ output = \"\(.key)\", mode = \"\(.value.mode)\", position = \"\(.value.x)x\(.value.y)\", scale = \(.value.scale), transform = \(.value.transform) })"
+            end'
+    } > "$ETC_DIR/monitors.lua.tmp"
+    printf '%s\n' "$norm" > "$ETC_DIR/monitors.json.tmp"
+    chmod 644 "$ETC_DIR/monitors.lua.tmp" "$ETC_DIR/monitors.json.tmp"
+    mv -f "$ETC_DIR/monitors.lua.tmp" "$ETC_DIR/monitors.lua"
+    mv -f "$ETC_DIR/monitors.json.tmp" "$ETC_DIR/monitors.json"
+    echo "Sign-in screen displays updated."
     ;;
 status)
     if systemctl is-enabled greetd.service >/dev/null 2>&1; then

@@ -34,6 +34,7 @@ depends=(
     # Funktionen der Einstellungen und der Shell – gehören fest dazu
     'bluez' 'bluez-utils'   # Bluetooth
     'power-profiles-daemon' # Energiemodus
+    'python-gobject'        # powerprofilesctl (bei Arch nur optional – ohne geht der Befehl nicht)
     'brightnessctl'         # Bildschirmhelligkeit
     'hyprsunset'            # Nachtlicht
     'ufw'                   # Firewall

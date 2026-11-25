@@ -20,6 +20,11 @@ efibootmgr
 snapper
 snap-pac
 
+# Energie: Energiemodus (Ausbalanciert/Energiesparen/Leistung) und Akku
+power-profiles-daemon
+python-gobject
+upower
+
 # Netzwerk, Ton, Grafik-Grundlage
 networkmanager
 pipewire

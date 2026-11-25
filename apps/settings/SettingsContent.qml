@@ -35,6 +35,9 @@ Rectangle {
     signal setLayout(string layout)
 
     property string path: "system"          // z. B. "system" oder "system/sound"
+    // Startseite aus etude-settings <seite> – Kurznamen wie „sound“ werden aufgelöst
+    property string initialPage: ""
+    Component.onCompleted: if (initialPage) path = Nav.resolve(initialPage)
     property var history: []
 
     // Responsiv (gekachelt oft schmal):
@@ -83,6 +86,12 @@ Rectangle {
         search.clear()
         scroll.contentY = 0
         if (kb) Qt.callLater(focusContent)
+    }
+    // Aufruf von außen (etude-settings <seite>, Schnelllinks der Leiste), wenn die App schon läuft:
+    // Suche beenden und zur Seite wechseln
+    function open(p) {
+        if (searching) search.clear()
+        navigate(p || "system")
     }
     function back() {
         if (searching) { search.clear(); return }

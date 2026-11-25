@@ -5,8 +5,11 @@ _enable_greeter() {
 }
 
 # Dienste für Bluetooth und Energiemodus (Einstellungen, Leiste) – wie bei Windows von Anfang an an
+# Läuft das System (nicht in pacstrap/chroot), auch gleich starten.
 _enable_services() {
-    systemctl enable bluetooth.service power-profiles-daemon.service >/dev/null 2>&1 || \
+    local now=""
+    [ -d /run/systemd/system ] && ! systemd-detect-virt --chroot -q 2>/dev/null && now=--now
+    systemctl enable $now bluetooth.service power-profiles-daemon.service >/dev/null 2>&1 || \
         echo ">> Dienste konnten nicht aktiviert werden: sudo systemctl enable --now bluetooth power-profiles-daemon"
 }
 
@@ -19,6 +22,8 @@ post_install() {
 
 post_upgrade() {
     _enable_greeter
+    # einmalig: bis 0.1.0-alpha.1 wurde power-profiles-daemon bei manchen Installationen nicht aktiviert
+    [ "$(vercmp "$2" 0.1.0alpha2)" -lt 0 ] && _enable_services
     echo ">> Etude wurde aktualisiert. Neue Einstellungen und Migrationen gelten nach dem nächsten Anmelden."
 }
 

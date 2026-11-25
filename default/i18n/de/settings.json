@@ -294,6 +294,8 @@
   "power.powerMode": "Energiemodus",
   "power.balancePerformanceAndEnergyUse": "Leistung und Energieverbrauch abwägen",
   "power.notAvailableInstallSudoPacman": "Nicht verfügbar – „sudo pacman -S power-profiles-daemon“ installieren",
+  "power.serviceStopped": "Der Dienst für den Energiemodus ist aus – einschalten, um den Modus zu wählen",
+  "power.enableService": "Einschalten",
   "power.bestPowerEfficiency": "Energieeffizienz",
   "power.balanced": "Ausbalanciert",
   "power.bestPerformance": "Höchstleistung",
