@@ -6,7 +6,7 @@
 # Lokal testen: ETUDE_SRC=~/dev/etude makepkg -sif
 
 pkgname=etude
-pkgver=0.1.0alpha1
+pkgver=0.1.0alpha2
 pkgrel=1
 pkgdesc="Etude – a Windows-like desktop on Hyprland: shell, settings, file explorer and task manager"
 arch=('any')
