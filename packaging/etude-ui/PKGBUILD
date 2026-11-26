@@ -5,7 +5,7 @@
 # Lokal testen: ETUDE_SRC=~/dev/etude makepkg -sif (nimmt den aktuellen Stand deines Checkouts)
 
 pkgname=etude-ui
-pkgver=0.1.0alpha1
+pkgver=0.1.0alpha2
 pkgrel=1
 pkgdesc="Etude UI – theme, components, i18n and settings for Etude apps (QML module Etude.Ui)"
 arch=('any')
