@@ -78,7 +78,7 @@ ShellRoot {
         position: config.notifyPosition          // Einstellungen › Benachrichtigungen › Position
     }
 
-    // Zwischenablage-Verlauf (Super+V)
+    // Zwischenablage-Verlauf (Super+Umschalt+V)
     ClipboardHistory { atBottom: config.barPosition !== "top" }
 
     // OSD für Lautstärke, Helligkeit, Mikrofon (Pille über der Taskleiste)

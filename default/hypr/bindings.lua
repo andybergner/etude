@@ -15,10 +15,43 @@ hl.bind(mod .. " + SUPER_L", startmenu, { release = true })               -- Sup
 hl.bind(mod .. " + S",       startmenu)                                   -- Super+S: Suche (= Startmenü)
 hl.bind(mod .. " + X", hl.dsp.exec_cmd(shell .. " ipc call startmenu context")) -- Super+X: Kontextmenü
 hl.bind(mod .. " + N", hl.dsp.exec_cmd(shell .. " ipc call notifications center")) -- Super+N: Benachrichtigungen
-hl.bind(mod .. " + V", hl.dsp.exec_cmd(shell .. " ipc call clipboard toggle"))     -- Super+V: Zwischenablage-Verlauf
+hl.bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd(shell .. " ipc call clipboard toggle")) -- Super+Umschalt+V: Zwischenablage-Verlauf
 hl.bind(mod .. " + I", hl.dsp.exec_cmd(settings))                         -- Einstellungen
 hl.bind(mod .. " + L", hl.dsp.exec_cmd(shell .. " ipc call lock lock"))   -- Sperren
 hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(taskmanager))            -- Task-Manager
+
+-- ===== Kopieren & Einfügen überall (wie Omarchy) =====
+-- Super+C / Super+V schicken dem Fenster Strg+C / Strg+V – in Terminals (Fenster-Tag „terminal“,
+-- siehe rules.lua) Strg+Umschalt+C / V. Ein virtuelles Tastaturgerät (wtype) geht dafür nicht:
+-- das gedrückte Super würde sich mit der gesendeten Taste mischen. Taste getrennt drücken und
+-- loslassen, weil send_shortcut sonst manchmal hängen bleibt (hyprwm/Hyprland#14099).
+-- Nach Omarchy (MIT, © David Heinemeier Hansson): default/hypr/bindings/clipboard.lua
+local function send_shortcut_once(mods, key)
+    return function()
+        hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down" }))
+        hl.timer(function()
+            hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up" }))
+        end, { timeout = 50, type = "oneshot" })
+    end
+end
+local function active_window_is_terminal()
+    local window = hl.get_active_window()
+    if not window then return false end
+    for _, tag in ipairs(window.tags or {}) do
+        if tag:gsub("%*$", "") == "terminal" then return true end
+    end
+    return false
+end
+local function universal(mods, key, terminal_mods, terminal_key)
+    return function()
+        if active_window_is_terminal() then send_shortcut_once(terminal_mods, terminal_key)()
+        else send_shortcut_once(mods, key)() end
+    end
+end
+-- Skripte (z. B. der Zwischenablage-Verlauf) fügen genauso ein: hyprctl dispatch 'etude.universal_paste'
+etude.universal_paste = universal("CTRL", "V", "CTRL SHIFT", "V")
+hl.bind(mod .. " + C", universal("CTRL", "C", "CTRL SHIFT", "C"))          -- Super+C: kopieren
+hl.bind(mod .. " + V", etude.universal_paste)                             -- Super+V: einfügen
 
 -- ===== Apps =====
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))                    -- Terminal

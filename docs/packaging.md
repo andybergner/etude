@@ -102,6 +102,13 @@ Updates kommen mit `pacman -Syu`.
 2. legt die Einstellungsbereiche an und verteilt eine alte `settings.json` (`etude-config migrate`),
 3. führt neue Migrationen aus `migrations/` aus (siehe dort).
 
+**Während eines Updates** (wie bei Omarchy): pacman-Hooks halten Hyprlands automatisches Neuladen an,
+solange pacman Dateien ersetzt (`10-etude-hyprland-reload-pause.hook`), sonst sähe Hyprland einen halben
+Stand und die Config wäre bis zum Neustart kaputt. Danach (`90-…-resume.hook`) läuft `etude-setup` in jeder
+laufenden Sitzung, Hyprland lädt einmal sauber neu, und die alten Einstellungen kommen zurück
+(`bin/etude-hyprland-reload-guard`). Wurde Hyprland selbst aktualisiert, bleibt das Neuladen bis zum
+nächsten Anmelden aus – das alte Programm kennt die neuen Einstellungen nicht.
+
 ## Wo was liegt
 
 | | Paket | Entwicklung |

@@ -1,6 +1,6 @@
-// Zwischenablage-Verlauf wie Windows (Win+V): zuletzt kopierte Texte und Bilder.
+// Zwischenablage-Verlauf (Super+Umschalt+V, wie Win+V bei Windows): zuletzt kopierte Texte und Bilder.
 // Speichert cliphist (Autostart: wl-paste --watch cliphist store). Klick oder Enter kopiert den
-// Eintrag und fügt ihn in das vorige Fenster ein (wtype, falls installiert). Entf löscht, Esc schließt.
+// Eintrag und fügt ihn in das vorige Fenster ein (wie Super+V, auch in Terminals). Entf löscht, Esc schließt.
 //   qs -p $ETUDE_HOME/shell ipc call clipboard toggle
 import Quickshell
 import Quickshell.Io
@@ -61,18 +61,11 @@ Scope {
         const e = entries[i]
         if (!e) return
         close()
-        // kopieren, dann ins vorige Fenster einfügen (über wtype, wenn vorhanden):
-        // Terminals mit Strg+Umschalt+V (Strg+V ist dort kein Einfügen), alle anderen mit Strg+V
+        // kopieren, dann ins vorige Fenster einfügen – über Hyprland wie Super+V
+        // (Terminals bekommen Strg+Umschalt+V, alle anderen Strg+V; siehe default/hypr/bindings.lua)
         Quickshell.execDetached(["sh", "-c",
-            "printf '%s' \"$1\" | cliphist decode | wl-copy && sleep 0.15 && " +
-            "command -v wtype >/dev/null 2>&1 || exit 0; " +
-            "cls=$(hyprctl activewindow -j 2>/dev/null | sed -n 's/.*\"class\": *\"\\([^\"]*\\)\".*/\\1/p' | head -n1); " +
-            "case \"$cls\" in " +
-            "kitty|Alacritty|foot|footclient|com.mitchellh.ghostty|org.wezfurlong.wezterm|xterm|XTerm|" +
-            "org.kde.konsole|konsole|org.gnome.Console|org.gnome.Terminal|gnome-terminal-server|" +
-            "com.system76.CosmicTerm|Termite|st|st-256color|URxvt) " +
-            "wtype -M ctrl -M shift v -m shift -m ctrl ;; " +
-            "*) wtype -M ctrl v -m ctrl ;; esac", "sh", e.line])
+            "printf '%s' \"$1\" | cliphist decode | wl-copy && sleep 0.2 && " +
+            "hyprctl dispatch 'etude.universal_paste' >/dev/null", "sh", e.line])
     }
     function remove(i) {
         const e = entries[i]

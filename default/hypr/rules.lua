@@ -20,6 +20,13 @@ hl.window_rule({
     no_focus = true,
 })
 
+-- Terminals markieren – Super+C / Super+V schicken ihnen Strg+Umschalt+C / V (bindings.lua)
+hl.window_rule({
+    name  = "etude-terminal-tag",
+    match = { class = "^(Alacritty|kitty|com\\.mitchellh\\.ghostty|foot|footclient|org\\.codeberg\\.dnkl\\.foot|org\\.wezfurlong\\.wezterm|etude-taskmanager|etude-terminal-dialog|etude-terminal.*)$" },
+    tag   = "+terminal",
+})
+
 -- Task-Manager (btop in kitty)
 hl.window_rule({
     name   = "etude-taskmanager",

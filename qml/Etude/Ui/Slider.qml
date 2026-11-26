@@ -22,12 +22,25 @@ Item {
     // Tastatur: Tab erreicht den Regler, Links/Rechts ändern in 5-%-Schritten (Hoch/Runter bleibt für die Navigation), Pos1/Ende springen an den Rand
     activeFocusOnTab: enabled_
     readonly property bool ownFocusRing: true           // FocusRoot zeichnet keinen zusätzlichen Ring
-    function nudge(d) { moved(Math.max(0, Math.min(1, Math.round((value + d) / step) * step))) }
+    // Eigene Änderungen kurz festhalten: Lautstärke/Helligkeit melden ihren Wert verzögert zurück –
+    // ohne das springt der Regler zwischendurch auf den alten Wert (z. B. von 100 % auf 95 %) und der
+    // nächste Schritt rechnet vom falschen Wert aus.
+    property real held: 0
+    property bool holding: false
+    readonly property real shown: holding ? held : value
+    Timer { id: holdTimer; interval: 800; onTriggered: root.holding = false }
+    function userSet(v) {
+        v = Math.max(0, Math.min(1, Math.round(v * 1000) / 1000))
+        held = v; holding = true; holdTimer.restart()
+        moved(v)
+    }
+    // Schritt von 5 %, immer auf das 5-%-Raster (97 % + Schritt = 100 %, nicht 102 % → 100 % → 95 %)
+    function nudge(d) { userSet(Math.round((shown + d) / 0.05) * 0.05) }
     Keys.onLeftPressed: nudge(-0.05)
     Keys.onRightPressed: nudge(0.05)
     Keys.onPressed: (e) => {
-        if (e.key === Qt.Key_Home) { moved(0); e.accepted = true }
-        else if (e.key === Qt.Key_End) { moved(1); e.accepted = true }
+        if (e.key === Qt.Key_Home) { userSet(0); e.accepted = true }
+        else if (e.key === Qt.Key_End) { userSet(1); e.accepted = true }
         else FocusNav.key(root, e)                       // Hoch/Runter: zum Nachbarn
     }
     readonly property bool keyboardFocus: activeFocus   // Klicks geben keinen Fokus – Fokus heißt hier Tastatur
@@ -48,7 +61,7 @@ Item {
     }
 
     readonly property real knob: 16
-    readonly property real pos: Math.max(0, Math.min(1, value)) * (width - knob)
+    readonly property real pos: Math.max(0, Math.min(1, shown)) * (width - knob)
 
     Rectangle {                       // Spur
         anchors.verticalCenter: parent.verticalCenter
@@ -85,16 +98,25 @@ Item {
         hoverEnabled: true
         function update(mx) {
             let v = Math.max(0, Math.min(1, (mx - 4 - root.knob / 2) / (root.width - root.knob)))
-            v = Math.round(v / root.step) * root.step
-            root.moved(v)
+            root.userSet(Math.round(v / root.step) * root.step)
         }
         onPressed: (e) => { root.engaged = true; update(e.x) }
         onPositionChanged: (e) => { if (pressed) update(e.x) }
         onContainsMouseChanged: if (!containsMouse && !pressed) root.engaged = false
         onReleased: if (!containsMouse) root.engaged = false
+        // Mausrad: eine Raste (120) = 5 %; Touchpads schicken viele kleine Werte – die werden gesammelt
+        property real wheelAcc: 0
         onWheel: (e) => {
             if (!root.wheelWanted()) { e.accepted = false; return }   // an die Seite weiterreichen
-            root.moved(Math.max(0, Math.min(1, root.value + (e.angleDelta.y > 0 ? 0.05 : -0.05))))
+            const d = e.angleDelta.y !== 0 ? e.angleDelta.y : e.angleDelta.x
+            if (d === 0) return
+            if ((d > 0) !== (wheelAcc > 0)) wheelAcc = 0              // Richtung gewechselt
+            wheelAcc += d
+            while (Math.abs(wheelAcc) >= 120) {
+                const up = wheelAcc > 0
+                root.nudge(up ? 0.05 : -0.05)
+                wheelAcc -= up ? 120 : -120
+            }
         }
     }
 }

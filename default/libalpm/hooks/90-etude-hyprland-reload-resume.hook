@@ -1,0 +1,12 @@
+# Nach Omarchy (MIT): default/libalpm/hooks/*-omarchy-hyprland-reload-*.hook
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = etude
+Target = etude-ui
+
+[Action]
+Description = Hyprland nach dem Etude-Update neu laden …
+When = PostTransaction
+Exec = /usr/bin/etude-hyprland-reload-guard resume
